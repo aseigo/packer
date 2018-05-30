@@ -44,7 +44,6 @@ defmodule Packer do
 
   defp encode_schema({code, elements}, acc) when is_list(elements) do
     subschema = encode_schema(elements)
-    count = Enum.count(elements)
     acc <> <<code :: 8-unsigned-integer, subschema :: binary, 0>>
   end
 
