@@ -1,10 +1,11 @@
 defmodule PackerTestMacros do
   defmacro expect(unpacked, packed) do
+    #line = __CALLER__.line
     quote do
       packed = Packer.encode(unquote(unpacked))
       assert packed === unquote(packed)
       assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
-      #IO.puts("Sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
+      #Logger.debug("Line #{unquote(line)} => sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
     end
   end
 end
@@ -12,6 +13,7 @@ end
 defmodule PackerTest do
   use ExUnit.Case
   require PackerTestMacros, as: M
+  require Logger
 
   doctest Packer
 
@@ -45,5 +47,9 @@ defmodule PackerTest do
     M.expect([[1]], [<<33, 33, 1, 0, 0>>, <<1>>])
     M.expect([1, [1], 2], [<<33, 1, 33, 1, 0, 1, 0>>, <<1, 1, 2>>])
     M.expect([1, [1, [], [:atom, [3]]], 2], [<<33, 1, 33, 1, 33, 0, 33, 12, 4, 33, 1, 0, 0, 0, 1, 0>>, <<1, 1, 97, 116, 111, 109, 3, 2>>])
+  end
+
+  test "packs tuples" do
+    M.expect({1, 2}, [<<66, 1, 1>>, <<1, 2>>])
   end
 end

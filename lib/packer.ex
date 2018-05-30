@@ -17,11 +17,11 @@ defmodule Packer do
   @c_list        0x21
   @c_map         0x22
   @c_struct      0x23
-  @c_tuple       0b010000000
+  @c_tuple       0b01000000
+  @c_repeat      0b10000010
+  @c_repeat_up   0b10000001
 
-  @c_repeat      0b100000010
-  @c_repeat_up   0b100000001
-
+  @c_max_short_tuple 0b01111111 - 0b01000000
   #@c_header_magic <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
 
   use Bitwise
@@ -42,13 +42,22 @@ defmodule Packer do
     #<<length :: 32-unsigned-integer, encoded :: binary>>
   end
 
-  defp encode_schema({code, elements}, acc) when is_list(elements) do
-    subschema = encode_schema(elements)
-    acc <> <<code :: 8-unsigned-integer, subschema :: binary, 0>>
-  end
-
   defp encode_schema({@c_atom, length}, acc) do
     acc <> <<@c_atom :: 8-unsigned-integer, length :: 8-unsigned-integer>>
+  end
+
+  defp encode_schema({@c_tuple, elements}, acc) do
+    arity = Enum.count(elements)
+    subschema = encode_schema(elements)
+    if arity < @c_max_short_tuple do
+      acc <> <<@c_tuple + arity :: 8-unsigned-integer>> <> subschema
+    else
+      acc <> <<@c_tuple :: 8-unsigned-integer, arity :: 16-unsigned-integer>> <> subschema
+    end
+  end
+
+  defp encode_schema({@c_list, elements}, acc) when is_list(elements) do
+    acc <> <<@c_list>> <> encode_schema(elements) <> <<0>>
   end
 
   defp encode_schema({code, length}, acc) do
@@ -57,6 +66,12 @@ defmodule Packer do
 
   defp encode_schema(code, acc) do
     acc <> <<code :: 8-unsigned-integer>>
+  end
+
+  defp e(schema, buffer, t) when is_tuple(t) do
+    arity = tuple_size(t)
+    {tuple_schema, buffer} = add_tuple([], buffer, t, arity, 0)
+    {[{@c_tuple, tuple_schema} | schema], buffer}
   end
 
   defp e(schema, buffer, t) when is_list(t) do
@@ -83,6 +98,18 @@ defmodule Packer do
 
   defp e(schema, buffer, t) when is_float(t) do
     {[@c_float | schema], buffer <> <<t :: 64-float>> }
+  end
+
+  defp add_tuple(schema, buffer, _tuple, arity, count) when count >= arity do
+    {Enum.reverse(schema), buffer}
+  end
+
+  defp add_tuple(schema, buffer, tuple, arity, count) do
+    {tuple_schema, tuple_buffer} =
+      tuple
+      |> elem(count)
+      |> (fn x -> e(schema, buffer, x) end).()
+    add_tuple(tuple_schema, tuple_buffer, tuple, arity, count + 1)
   end
 
   defp add_list(schema, buffer, []) do
