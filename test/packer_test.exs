@@ -3,7 +3,8 @@ defmodule PackerTestMacros do
     quote do
       packed = Packer.encode(unquote(unpacked))
       assert packed === unquote(packed)
-      #assert byte_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
+      assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
+      #IO.puts("Sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
     end
   end
 end
