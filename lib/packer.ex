@@ -1,0 +1,104 @@
+defmodule Packer do
+  @c_small_int  0x01
+  @c_small_uint 0x02
+  @c_short_int  0x03
+  @c_short_uint 0x04
+  @c_int        0x05
+  @c_uint       0x06
+  @c_big_int    0x07
+  #TODO: @c_huge_int   0x08
+
+  @c_byte       0x09
+  @c_binary     0x0A
+  @c_float      0x0B
+  @c_atom       0x0C
+
+  @c_list       0x21
+  @c_map        0x22
+  @c_struct     0x23
+  @c_tuple      0b010000000
+
+  @c_repeat     0b100000010
+  @c_repeat_up  0b100000001
+
+  use Bitwise
+
+  def encode(term) do
+    #TODO: measure if the schema performs better as a :queue?
+    {schema, buffer} = e([], <<>>, term)
+    encoded_schema = schema
+                     |> Enum.reverse()
+                     |> encode_schema()
+    {encoded_schema, buffer}
+  end
+
+  defp encode_schema(schema) do
+    schema
+    #encode_schema(<<>>, schema)
+  end
+
+  defp encode_schema(bin, []), do: bin
+
+  defp e(schema, buffer, t) when is_list(t) do
+    {list_schema, buffer} = add_list([], buffer, t)
+    {[{@c_list, list_schema} | schema], buffer}
+  end
+
+  defp e(schema, buffer, t) when is_integer(t) do
+    add_integer(schema, buffer, t)
+  end
+
+  defp e(schema, buffer, <<_byte :: 8>> = t) do
+    {[@c_byte | schema], buffer <> t}
+  end
+
+  defp e(schema, buffer, t) when is_bitstring(t) do
+    {[{@c_binary, byte_size(t)} | schema], buffer <> t}
+  end
+
+  defp e(schema, buffer, t) when is_atom(t) do
+    bin = to_string(t)
+    {[{@c_atom, byte_size(bin)} | schema], buffer <> bin}
+  end
+
+  defp e(schema, buffer, t) when is_float(t) do
+    {[@c_float | schema], buffer <> <<t :: 64-float>> }
+  end
+
+  defp add_list(schema, buffer, []) do
+    {Enum.reverse(schema), buffer}
+  end
+
+  defp add_list(schema, buffer, [next | rest]) do
+    {schema, buffer} = e(schema, buffer, next)
+    add_list(schema, buffer, rest)
+  end
+
+  defp add_integer(schema, buffer, t) when t >= 0 and t <=255 do
+    {[@c_small_int | schema], buffer <> <<t :: 8-unsigned-integer>>}
+  end
+
+  defp add_integer(schema, buffer, t) when t >= -127 and t < 0 do
+    {[@c_small_uint | schema], buffer <> <<t :: 8-signed-integer>>}
+  end
+
+  defp add_integer(schema, buffer, t) when t >= 0 and t <= 65_535 do
+    {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
+  end
+
+  defp add_integer(schema, buffer, t) when t >= -32_767 and t < 0 do
+    {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
+  end
+
+  defp add_integer(schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
+    {[@c_int | schema], buffer <> <<t :: 32-unsigned-integer>>}
+  end
+
+  defp add_integer(schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
+    {[@c_uint | schema], buffer <> <<t :: 32-signed-integer>>}
+  end
+
+  defp add_integer(schema, buffer, t) do
+    {[@c_big_int | schema], buffer <> <<t :: 64-signed-integer>>}
+  end
+end
