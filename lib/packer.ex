@@ -1,25 +1,28 @@
 defmodule Packer do
-  @c_small_int  0x01
-  @c_small_uint 0x02
-  @c_short_int  0x03
-  @c_short_uint 0x04
-  @c_int        0x05
-  @c_uint       0x06
-  @c_big_int    0x07
+  @c_collect_end 0x00
+  @c_small_int   0x01
+  @c_small_uint  0x02
+  @c_short_int   0x03
+  @c_short_uint  0x04
+  @c_int         0x05
+  @c_uint        0x06
+  @c_big_int     0x07
   #TODO: @c_huge_int   0x08
 
-  @c_byte       0x09
-  @c_binary     0x0A
-  @c_float      0x0B
-  @c_atom       0x0C
+  @c_byte        0x09
+  @c_binary      0x0A
+  @c_float       0x0B
+  @c_atom        0x0C
 
-  @c_list       0x21
-  @c_map        0x22
-  @c_struct     0x23
-  @c_tuple      0b010000000
+  @c_list        0x21
+  @c_map         0x22
+  @c_struct      0x23
+  @c_tuple       0b010000000
 
-  @c_repeat     0b100000010
-  @c_repeat_up  0b100000001
+  @c_repeat      0b100000010
+  @c_repeat_up   0b100000001
+
+  #@c_header_magic <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
 
   use Bitwise
 
@@ -29,15 +32,29 @@ defmodule Packer do
     encoded_schema = schema
                      |> Enum.reverse()
                      |> encode_schema()
-    {encoded_schema, buffer}
+    [encoded_schema, buffer]
   end
 
   defp encode_schema(schema) do
-    schema
-    #encode_schema(<<>>, schema)
+    #TODO: remove repetition in the schema
+    Enum.reduce(schema, <<>>, &encode_schema/2)
+    #length = byte_size(encoded)
+    #<<length :: 32-unsigned-integer, encoded :: binary>>
   end
 
-  defp encode_schema(bin, []), do: bin
+  defp encode_schema({code, elements}, acc) when is_list(elements) do
+    subschema = encode_schema(elements)
+    count = Enum.count(elements)
+    acc <> <<code :: 8-unsigned-integer, subschema :: binary, 0>>
+  end
+
+  defp encode_schema({code, length}, acc) do
+    acc <> <<code :: 8-unsigned-integer, length :: 32-unsigned-integer>>
+  end
+
+  defp encode_schema(code, acc) do
+    acc <> <<code :: 8-unsigned-integer>>
+  end
 
   defp e(schema, buffer, t) when is_list(t) do
     {list_schema, buffer} = add_list([], buffer, t)
