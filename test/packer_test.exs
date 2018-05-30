@@ -30,18 +30,19 @@ defmodule PackerTest do
     M.expect("b", [<<9>>, "b"])
     M.expect("binary", [<<10, 0, 0, 0, 6>>, "binary"])
     M.expect(3.14, [<<11>>, <<64, 9, 30, 184, 81, 235, 133, 31>>])
-    M.expect(:atom, [<<12, 0, 0, 0, 4>>, "atom"])
+    M.expect(:atom, [<<12, 4>>, "atom"])
   end
 
   test "packs flat lists" do
     M.expect([], [<<33, 0>>, <<>>])
     M.expect([1], [<<33, 1, 0>>, <<1>>])
-    M.expect([1, :atom, "binary"], [<<33, 1, 12, 0, 0, 0, 4, 10, 0, 0, 0, 6, 0>>, <<1, "atom", "binary">>])
+    M.expect([1, :atom, "binary"], [<<33, 1, 12, 4, 10, 0, 0, 0, 6, 0>>, <<1, "atom", "binary">>])
   end
 
   test "packs nested lists" do
     M.expect([[]], [<<33, 33, 0, 0>>, <<>>])
     M.expect([[1]], [<<33, 33, 1, 0, 0>>, <<1>>])
     M.expect([1, [1], 2], [<<33, 1, 33, 1, 0, 1, 0>>, <<1, 1, 2>>])
+    M.expect([1, [1, [], [:atom, [3]]], 2], [<<33, 1, 33, 1, 33, 0, 33, 12, 4, 33, 1, 0, 0, 0, 1, 0>>, <<1, 1, 97, 116, 111, 109, 3, 2>>])
   end
 end

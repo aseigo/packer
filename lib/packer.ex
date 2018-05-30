@@ -48,6 +48,10 @@ defmodule Packer do
     acc <> <<code :: 8-unsigned-integer, subschema :: binary, 0>>
   end
 
+  defp encode_schema({@c_atom, length}, acc) do
+    acc <> <<@c_atom :: 8-unsigned-integer, length :: 8-unsigned-integer>>
+  end
+
   defp encode_schema({code, length}, acc) do
     acc <> <<code :: 8-unsigned-integer, length :: 32-unsigned-integer>>
   end
