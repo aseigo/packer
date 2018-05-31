@@ -56,8 +56,8 @@ defmodule Packer do
     end
   end
 
-  defp encode_schema({@c_list, elements}, acc) when is_list(elements) do
-    acc <> <<@c_list>> <> encode_schema(elements) <> <<0>>
+  defp encode_schema({code, elements}, acc) when is_list(elements) do
+    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<0>>
   end
 
   defp encode_schema({code, length}, acc) do
