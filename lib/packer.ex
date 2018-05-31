@@ -18,8 +18,10 @@ defmodule Packer do
   @c_map         0x22
   @c_struct      0x23
   @c_tuple       0b01000000
-  @c_repeat      0b10000010
-  @c_repeat_up   0b10000001
+  @c_repeat_1    0b10100000
+  @c_repeat_2    0b10100001
+  @c_repeat_4    0b10100010
+  #@c_repeat_up   0b10100100
 
   @c_max_short_tuple 0b01111111 - 0b01000000
   #@c_header_magic <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
@@ -69,6 +71,18 @@ defmodule Packer do
     end
   end
 
+  defp encode_schema({:rep, @c_repeat_1, reps}, acc) do
+    acc <> <<@c_repeat_1 :: 8-unsigned-integer, reps :: 8-unsigned-integer>>
+  end
+
+  defp encode_schema({:rep, @c_repeat_2, reps}, acc) do
+    acc <> <<@c_repeat_1 :: 8-unsigned-integer, reps :: 16-unsigned-integer>>
+  end
+
+  defp encode_schema({:rep, @c_repeat_4, reps}, acc) do
+    acc <> <<@c_repeat_1 :: 8-unsigned-integer, reps :: 32-unsigned-integer>>
+  end
+
   defp encode_schema({code, elements}, acc) when is_list(elements) do
     acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<0>>
   end
@@ -80,6 +94,34 @@ defmodule Packer do
   defp encode_schema(code, acc) do
     acc <> <<code :: 8-unsigned-integer>>
   end
+
+  defp compress_schema(schema) do
+    compress_schema(schema, [], :__nothing_equals_me__, 0)
+    |> Enum.reverse()
+  end
+
+  defp compress_schema([], schema, :__nothing_equals_me__, 0), do: schema
+  defp compress_schema([], schema, last, 0), do: [last | schema]
+  defp compress_schema([], schema, last, reps), do: [last, repeater_tuple(reps) | schema]
+  defp compress_schema([next | rest], schema, last, reps) when next === last do
+    compress_schema(rest, schema, last, reps + 1)
+  end
+  defp compress_schema([next | rest], schema, last, reps) when reps > 0 do
+    compress_schema(rest, [last, repeater_tuple(reps) | schema], next, 0)
+  end
+  defp compress_schema([next | rest], schema, :__nothing_equals_me__, _reps) do
+    compress_schema(rest, schema, next, 0)
+  end
+  defp compress_schema([next | rest], schema, last, _reps) do
+    compress_schema(rest, [last | schema], next, 0)
+  end
+
+  # note: 1 is added to the reps since at the time of being called, the last
+  # rep will have not been tallied, or looked at another way the first item
+  # is "zeroth rep'd", and so we always are one short here
+  defp repeater_tuple(reps) when reps < 256, do: {:rep, @c_repeat_1, reps + 1}
+  defp repeater_tuple(reps) when reps < 65536, do: {:rep, @c_repeat_2, reps + 1}
+  defp repeater_tuple(reps), do: {:rep, @c_repeat_4, reps + 1}
 
   defp e(schema, buffer, t) when is_tuple(t) do
     arity = tuple_size(t)
