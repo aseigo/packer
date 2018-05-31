@@ -74,6 +74,11 @@ defmodule Packer do
     {[{@c_tuple, Enum.reverse(tuple_schema)} | schema], buffer}
   end
 
+  defp e(schema, buffer, t) when is_map(t) do
+    {map_schema, buffer} = Enum.reduce(t, {[], buffer}, &add_map_tuple/2)
+    {[{@c_map, Enum.reverse(map_schema)} | schema], buffer}
+  end
+
   defp e(schema, buffer, t) when is_list(t) do
     {list_schema, buffer} = add_list([], buffer, t)
     {[{@c_list, list_schema} | schema], buffer}
@@ -98,6 +103,11 @@ defmodule Packer do
 
   defp e(schema, buffer, t) when is_float(t) do
     {[@c_float | schema], buffer <> <<t :: 64-float>> }
+  end
+
+  defp add_map_tuple({key, value}, {schema, buffer}) do
+    {schema, buffer} = e(schema, buffer, key)
+    e(schema, buffer, value)
   end
 
   defp add_tuple(schema, buffer, _tuple, arity, count) when count >= arity do
