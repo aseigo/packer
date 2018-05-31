@@ -16,7 +16,7 @@ defmodule Packer do
 
   @c_list        0x21
   @c_map         0x22
-  @c_struct      0x23
+  #@c_struct      0x23
   @c_tuple       0b01000000
   @c_repeat_1    0b10100000
   @c_repeat_2    0b10100001
@@ -69,6 +69,21 @@ defmodule Packer do
     else
       acc <> <<@c_tuple :: 8-unsigned-integer, arity :: 16-unsigned-integer>> <> subschema
     end
+  end
+
+  defp encode_schema({@c_map, elements}, acc) do
+    encoded_elements =
+      Enum.reduce(elements, <<>>, fn
+        {value, key}, e ->
+          e = encode_schema(value, e)
+          encode_schema(key, e)
+
+        value, e ->
+          # repeaters, e.g.
+          encode_schema(value, e)
+      end)
+
+    acc <> <<@c_map:: 8-unsigned-integer>> <> encoded_elements <> <<@c_collect_end>>
   end
 
   defp encode_schema({:rep, @c_repeat_1, reps}, acc) do
@@ -130,10 +145,10 @@ defmodule Packer do
   end
 
   defp e(schema, buffer, t) when is_map(t) do
-      case Map.get(t, :__struct__) do
-        nil    -> add_map(schema, buffer, t)
-        module -> add_struct(schema, buffer, t, module)
-      end
+    case Map.get(t, :__struct__) do
+      nil    -> add_map(schema, buffer, t)
+      module -> add_struct(schema, buffer, t, module)
+    end
   end
 
   defp e(schema, buffer, t) when is_list(t) do
@@ -167,17 +182,30 @@ defmodule Packer do
                            |> Map.from_struct()
                            |> Enum.reduce({[], buffer}, &add_map_tuple/2)
     {map_schema, buffer} = add_map_tuple({:__struct__, module}, {map_schema, buffer})
-    {[{@c_struct, Enum.reverse(map_schema)} | schema], buffer}
+
+    map_schema =
+      map_schema
+      |> Enum.reverse()
+      |> compress_schema()
+
+    {[{@c_map, map_schema} | schema], buffer}
   end
 
   defp add_map(schema, buffer, t)  do
     {map_schema, buffer} = Enum.reduce(t, {[], buffer}, &add_map_tuple/2)
-    {[{@c_map, Enum.reverse(map_schema)} | schema], buffer}
+
+    map_schema =
+      map_schema
+      |> Enum.reverse()
+      |> compress_schema()
+
+    {[{@c_map, map_schema} | schema], buffer}
   end
 
   defp add_map_tuple({key, value}, {schema, buffer}) do
-    {schema, buffer} = e(schema, buffer, key)
-    e(schema, buffer, value)
+    {[key_schema], buffer} = e([], buffer, key)
+    {[value_schema], buffer} = e([], buffer, value)
+    {[{key_schema, value_schema} | schema], buffer}
   end
 
   defp add_tuple(schema, buffer, _tuple, arity, count) when count >= arity do
