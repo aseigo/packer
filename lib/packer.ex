@@ -75,8 +75,7 @@ defmodule Packer do
     acc <> <<@c_atom :: 8-unsigned-integer, length :: 8-unsigned-integer>>
   end
 
-  defp encode_schema({@c_tuple, elements}, acc) do
-    arity = Enum.count(elements)
+  defp encode_schema({@c_tuple, arity, elements}, acc) do
     subschema = encode_schema(elements)
     if arity < @c_max_short_tuple do
       acc <> <<@c_tuple + arity :: 8-unsigned-integer>> <> subschema
@@ -155,7 +154,11 @@ defmodule Packer do
   defp e(schema, buffer, t) when is_tuple(t) do
     arity = tuple_size(t)
     {tuple_schema, buffer} = add_tuple([], buffer, t, arity, 0)
-    {[{@c_tuple, Enum.reverse(tuple_schema)} | schema], buffer}
+    tuple_schema = tuple_schema
+                   |> Enum.reverse()
+                   |> compress_schema()
+
+    {[{@c_tuple, arity, tuple_schema} | schema], buffer}
   end
 
   defp e(schema, buffer, t) when is_map(t) do
