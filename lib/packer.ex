@@ -7,7 +7,7 @@ defmodule Packer do
   @c_int         0x05
   @c_uint        0x06
   @c_big_int     0x07
-  #TODO: @c_huge_int   0x08
+  #@c_huge_int   0x08
 
   @c_byte        0x09
   @c_binary      0x0A
@@ -16,7 +16,6 @@ defmodule Packer do
 
   @c_list        0x21
   @c_map         0x22
-  #@c_struct      0x23
   @c_tuple       0b01000000
   @c_repeat_1    0b10100000
   @c_repeat_2    0b10100001
@@ -30,10 +29,12 @@ defmodule Packer do
 
   # TODO
   #
-  # * schema compression actually inflates the size of encode({1, 2})!
+  # * schema compression actually inflates the size of encode({1, 2})
+  #
+  # * implement @c_huge_int
   #
   # * compressing the schema probably should be done while building the schema
-  #   to avoid going through it more than once
+  #   to avoid going through it more than once.
   #   this would perhaps open up additional opportunities for efficiency when
   #   small and not-so-small numbers end up alternating
   #
@@ -65,7 +66,6 @@ defmodule Packer do
   end
 
   defp encode_schema(schema) do
-    #TODO: remove repetition in the schema
     Enum.reduce(schema, <<>>, &encode_schema/2)
     #length = byte_size(encoded)
     #<<length :: 32-unsigned-integer, encoded :: binary>>
