@@ -76,15 +76,8 @@ defmodule Packer do
 
   defp e(schema, buffer, t) when is_map(t) do
       case Map.get(t, :__struct__) do
-        nil ->
-          {map_schema, buffer} = Enum.reduce(t, {[], buffer}, &add_map_tuple/2)
-          {[{@c_map, Enum.reverse(map_schema)} | schema], buffer}
-        mod ->
-          {map_schema, buffer} = t
-                                 |> Map.from_struct()
-                                 |> Enum.reduce({[], buffer}, &add_map_tuple/2)
-          {map_schema, buffer} = add_map_tuple({:__struct__, mod}, {map_schema, buffer})
-          {[{@c_struct, Enum.reverse(map_schema)} | schema], buffer}
+        nil    -> add_map(schema, buffer, t)
+        module -> add_struct(schema, buffer, t, module)
       end
   end
 
@@ -112,6 +105,19 @@ defmodule Packer do
 
   defp e(schema, buffer, t) when is_float(t) do
     {[@c_float | schema], buffer <> <<t :: 64-float>> }
+  end
+
+  defp add_struct(schema, buffer, t, module) do
+    {map_schema, buffer} = t
+                           |> Map.from_struct()
+                           |> Enum.reduce({[], buffer}, &add_map_tuple/2)
+    {map_schema, buffer} = add_map_tuple({:__struct__, module}, {map_schema, buffer})
+    {[{@c_struct, Enum.reverse(map_schema)} | schema], buffer}
+  end
+
+  defp add_map(schema, buffer, t)  do
+    {map_schema, buffer} = Enum.reduce(t, {[], buffer}, &add_map_tuple/2)
+    {[{@c_map, Enum.reverse(map_schema)} | schema], buffer}
   end
 
   defp add_map_tuple({key, value}, {schema, buffer}) do
