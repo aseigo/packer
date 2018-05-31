@@ -1,3 +1,7 @@
+defmodule F do
+  defstruct a: 1, b: 2
+end
+
 defmodule PackerTestMacros do
   defmacro expect(unpacked, packed) do
     #line = __CALLER__.line
@@ -85,5 +89,15 @@ defmodule PackerTest do
     M.expect(%{}, [<<34, 0>>, ""])
     M.expect(%{a: 1, b: 2}, [<<34, 12, 1, 1, 12, 1, 1, 0>>, <<97, 1, 98, 2>>])
     M.expect(%{{"b", 123} => 1, {"c", 124} => 2}, [<<34, 66, 9, 1, 1, 66, 9, 1, 1, 0>>, <<98, 123, 1, 99, 124, 2>>])
+  end
+
+  test "packs structs" do
+    M.expect(%F{},
+              [
+                <<35, 12, 1, 1, 12, 1, 1, 12, 10, 12, 8, 0>>,
+                <<97, 1, 98, 2, 95, 95, 115, 116, 114, 117, 99, 116, 95, 95, 69, 108, 105,
+                  120, 105, 114, 46, 70>>
+              ]
+            )
   end
 end
