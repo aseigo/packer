@@ -112,7 +112,7 @@ defmodule Packer do
   end
 
   defp encode_schema({code, elements}, acc) when is_list(elements) do
-    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<0>>
+    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<@c_collect_end>>
   end
 
   defp encode_schema({code, length}, acc) do
