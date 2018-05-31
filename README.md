@@ -10,6 +10,11 @@ Pack significantly reduces the space required to serialize a term by utilizing a
 schema + buffer approach with support for shape repetition (e.g. "N * two-tuple of
 integers").
 
+  NOTE: this library is still in early development, and not ready for production use.
+  Documentation of the serialization format, apidocs, etc. will come once things calm
+  down a bit. The encoding is still in flux, and the api is still growing and what is
+  there is not finalized, so one step at a time. :)
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
