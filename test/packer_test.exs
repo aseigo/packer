@@ -65,6 +65,7 @@ defmodule PackerTest do
   test "packs flat lists" do
     M.expect([], [<<33, 0>>, <<>>])
     M.expect([1], [<<33, 1, 0>>, <<1>>])
+    M.expect([1, 2, 3, 4, 5, 6, 7000], [<<33, 160, 6, 1, 3, 0>>, <<1, 2, 3, 4, 5, 6, 27, 88>>])
     M.expect([1, :atom, "binary"], [<<33, 1, 12, 4, 10, 0, 0, 0, 6, 0>>, <<1, "atom", "binary">>])
   end
 
