@@ -47,7 +47,21 @@ defmodule Packer do
     encoded_schema = schema
                      |> Enum.reverse()
                      |> encode_schema()
-    [encoded_schema, buffer]
+
+    if byte_size(buffer) > 15 do
+      z = :zlib.open()
+      :ok = :zlib.deflateInit(z)
+      [compressed_buffer] = :zlib.deflate(z, buffer, :finish)
+      :ok = :zlib.deflateEnd(z)
+      :zlib.close(z)
+      if byte_size(compressed_buffer) < byte_size(buffer) do
+        [encoded_schema, compressed_buffer]
+      else
+        [encoded_schema, buffer]
+      end
+    else
+      [encoded_schema, buffer]
+    end
   end
 
   defp encode_schema(schema) do

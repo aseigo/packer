@@ -4,13 +4,35 @@ end
 
 defmodule PackerTestMacros do
   defmacro expect(unpacked, packed) do
-    #line = __CALLER__.line
+    line = __CALLER__.line
     quote do
       packed = Packer.encode(unquote(unpacked))
-      assert packed === unquote(packed)
-      assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
-      #Logger.debug("Line #{unquote(line)} => sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
+      [schema, compressed_buffer] = packed
+      buffer = PackerTestMacros.decompress(compressed_buffer)
+      assert [schema, buffer] === unquote(packed)
+      assert :erlang.iolist_size([schema, compressed_buffer]) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
+      Logger.debug("Line #{unquote(line)} => sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
     end
+  end
+
+  def decompress(buffer) do
+    z = :zlib.open()
+    :ok = :zlib.inflateInit(z)
+
+    uncompressed =
+      try do
+        v =
+        case :zlib.inflate(z, buffer) do
+          []  -> ""
+          [v] -> v
+        end
+        :ok = :zlib.inflateEnd(z)
+        v
+      rescue
+        ErlangError -> buffer
+      end
+    :zlib.close(z)
+    uncompressed
   end
 end
 
