@@ -170,6 +170,7 @@ defmodule Packer do
 
   defp e(schema, buffer, t) when is_list(t) do
     {list_schema, buffer} = add_list([], buffer, t)
+    list_schema = compress_schema(list_schema)
     {[{@c_list, list_schema} | schema], buffer}
   end
 
