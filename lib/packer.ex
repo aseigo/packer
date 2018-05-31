@@ -71,7 +71,7 @@ defmodule Packer do
   defp e(schema, buffer, t) when is_tuple(t) do
     arity = tuple_size(t)
     {tuple_schema, buffer} = add_tuple([], buffer, t, arity, 0)
-    {[{@c_tuple, tuple_schema} | schema], buffer}
+    {[{@c_tuple, Enum.reverse(tuple_schema)} | schema], buffer}
   end
 
   defp e(schema, buffer, t) when is_list(t) do
@@ -101,7 +101,7 @@ defmodule Packer do
   end
 
   defp add_tuple(schema, buffer, _tuple, arity, count) when count >= arity do
-    {Enum.reverse(schema), buffer}
+    {schema, buffer}
   end
 
   defp add_tuple(schema, buffer, tuple, arity, count) do
