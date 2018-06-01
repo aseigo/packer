@@ -49,10 +49,10 @@ defmodule Packer do
                      |> Enum.reverse()
                      |> encode_schema()
 
-    if byte_size(buffer) > 15 do
+    if byte_size(buffer) < 0 do
       z = :zlib.open()
       :ok = :zlib.deflateInit(z)
-      [compressed_buffer] = :zlib.deflate(z, buffer, :finish)
+      compressed_buffer = :zlib.deflate(z, buffer, :finish) |> :erlang.list_to_binary()
       :ok = :zlib.deflateEnd(z)
       :zlib.close(z)
       if byte_size(compressed_buffer) < byte_size(buffer) do
@@ -192,7 +192,7 @@ defmodule Packer do
   end
 
   defp e(schema, buffer, t) when is_float(t) do
-    {[@c_float | schema], buffer <> <<t :: 64-float>> }
+    {[@c_float | schema], buffer <> <<t :: 64-float>>}
   end
 
   defp add_struct(schema, buffer, t, module) do
@@ -223,6 +223,7 @@ defmodule Packer do
   defp add_map_tuple({key, value}, {schema, buffer}) do
     {[key_schema], buffer} = e([], buffer, key)
     {[value_schema], buffer} = e([], buffer, value)
+    #IO.inspect(buffer, label: "add map tuple")
     {[{key_schema, value_schema} | schema], buffer}
   end
 
