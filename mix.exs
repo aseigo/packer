@@ -19,7 +19,8 @@ defmodule Pack.MixProject do
 
   defp deps do
     [
-      {:remix, "~> 0.0.2", only: [:dev]}
+      {:remix, "~> 0.0.2", only: [:dev]},
+      {:brotli, "~> 0.2.0"}
     ]
   end
 end
