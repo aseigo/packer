@@ -23,7 +23,7 @@ defmodule Packer do
   #@c_repeat_up   0b10100100
 
   @c_max_short_tuple 0b01111111 - 0b01000000
-  #@c_header_magic <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
+  @c_header <<0x45, 0x50, 0x4B, 0x52, 0x00, 0x01>> # 'EPKR01'
 
   use Bitwise
 
@@ -42,26 +42,48 @@ defmodule Packer do
   #   this is a trick :erlang.term_to_binary employs, implying such lists are
   #   super common enough to warrant a unique id and saving an extra byte or two
 
-  def encode(term) do
-    #TODO: measure if the schema performs better as a :queue?
-    {schema, buffer} = e([], <<>>, term)
+  @doc """
+  Encodes a term. Returns an array with the version-specific magic string, the
+  data schema, and buffer.
+
+  Options supported include compress (boolean, defaulting to true) and small_int
+  (boolean, default to true; when false integers that would fit into a single byte
+  are instead encoded in 2 bytes; for large terms with a mix of single- and two-byte
+  encodable integers, setting small_int to false to can result in a significantly
+  smaller schema)
+  """
+  @spec encode(term :: any(), opts :: encode_options()) :: iolist()
+  @type encode_options() :: [{:compress, boolean}, {:short_int, boolean}]
+  def encode(term, opts \\ []) do
+    {schema, buffer} = encode_one(opts, [], <<>>, term)
     encoded_schema = schema
                      |> Enum.reverse()
                      |> encode_schema()
 
-    if byte_size(buffer) < 0 do
-      z = :zlib.open()
-      :ok = :zlib.deflateInit(z)
-      compressed_buffer = :zlib.deflate(z, buffer, :finish) |> :erlang.list_to_binary()
-      :ok = :zlib.deflateEnd(z)
-      :zlib.close(z)
+    compress? = Keyword.get(opts, :compress, true)
+    if compress? do
+      compressed_buffer = compress(:zlib, buffer)
+      IO.puts("#{byte_size(compressed_buffer)} < #{byte_size(buffer)}")
       if byte_size(compressed_buffer) < byte_size(buffer) do
-        [encoded_schema, compressed_buffer]
+        encoded_iodata(encoded_schema, compressed_buffer, opts)
       else
-        [encoded_schema, buffer]
+        encoded_iodata(encoded_schema, buffer, opts)
       end
     else
-      [encoded_schema, buffer]
+      encoded_iodata(encoded_schema, buffer, opts)
+    end
+  end
+
+  @doc """
+  Returns the magic string header prepended to encodings
+  """
+  def encoded_term_header(), do: @c_header
+
+  defp encoded_iodata(schema, buffer, opts) do
+    if Keyword.get(opts, :header, false) do
+      [@c_header, schema, buffer]
+    else
+      [schema, buffer]
     end
   end
 
@@ -151,9 +173,9 @@ defmodule Packer do
   defp repeater_tuple(reps) when reps < 65536, do: {:rep, @c_repeat_2, reps + 1}
   defp repeater_tuple(reps), do: {:rep, @c_repeat_4, reps + 1}
 
-  defp e(schema, buffer, t) when is_tuple(t) do
+  defp encode_one(opts, schema, buffer, t) when is_tuple(t) do
     arity = tuple_size(t)
-    {tuple_schema, buffer} = add_tuple([], buffer, t, arity, 0)
+    {tuple_schema, buffer} = add_tuple(opts, [], buffer, t, arity, 0)
     tuple_schema = tuple_schema
                    |> Enum.reverse()
                    |> compress_schema()
@@ -161,45 +183,45 @@ defmodule Packer do
     {[{@c_tuple, arity, tuple_schema} | schema], buffer}
   end
 
-  defp e(schema, buffer, t) when is_map(t) do
+  defp encode_one(opts, schema, buffer, t) when is_map(t) do
     case Map.get(t, :__struct__) do
-      nil    -> add_map(schema, buffer, t)
-      module -> add_struct(schema, buffer, t, module)
+      nil    -> add_map(opts, schema, buffer, t)
+      module -> add_struct(opts, schema, buffer, t, module)
     end
   end
 
-  defp e(schema, buffer, t) when is_list(t) do
-    {list_schema, buffer} = add_list([], buffer, t)
+  defp encode_one(opts, schema, buffer, t) when is_list(t) do
+    {list_schema, buffer} = add_list(opts, [], buffer, t)
     list_schema = compress_schema(list_schema)
     {[{@c_list, list_schema} | schema], buffer}
   end
 
-  defp e(schema, buffer, t) when is_integer(t) do
-    add_integer(schema, buffer, t)
+  defp encode_one(opts, schema, buffer, t) when is_integer(t) do
+    add_integer(opts, schema, buffer, t)
   end
 
-  defp e(schema, buffer, <<_byte :: 8>> = t) do
+  defp encode_one(_opts, schema, buffer, <<_byte :: 8>> = t) do
     {[@c_byte | schema], buffer <> t}
   end
 
-  defp e(schema, buffer, t) when is_bitstring(t) do
+  defp encode_one(_opts, schema, buffer, t) when is_bitstring(t) do
     {[{@c_binary, byte_size(t)} | schema], buffer <> t}
   end
 
-  defp e(schema, buffer, t) when is_atom(t) do
+  defp encode_one(_opts, schema, buffer, t) when is_atom(t) do
     bin = to_string(t)
     {[{@c_atom, byte_size(bin)} | schema], buffer <> bin}
   end
 
-  defp e(schema, buffer, t) when is_float(t) do
+  defp encode_one(_opts, schema, buffer, t) when is_float(t) do
     {[@c_float | schema], buffer <> <<t :: 64-float>>}
   end
 
-  defp add_struct(schema, buffer, t, module) do
-    {map_schema, buffer} = t
+  defp add_struct(opts, schema, buffer, t, module) do
+    {_, map_schema, buffer} = t
                            |> Map.from_struct()
-                           |> Enum.reduce({[], buffer}, &add_map_tuple/2)
-    {map_schema, buffer} = add_map_tuple({:__struct__, module}, {map_schema, buffer})
+                           |> Enum.reduce({opts, [], buffer}, &add_map_tuple/2)
+    {_, map_schema, buffer} = add_map_tuple({:__struct__, module}, {opts, map_schema, buffer})
 
     map_schema =
       map_schema
@@ -209,8 +231,8 @@ defmodule Packer do
     {[{@c_map, map_schema} | schema], buffer}
   end
 
-  defp add_map(schema, buffer, t)  do
-    {map_schema, buffer} = Enum.reduce(t, {[], buffer}, &add_map_tuple/2)
+  defp add_map(opts, schema, buffer, t)  do
+    {_opts, map_schema, buffer} = Enum.reduce(t, {opts, [], buffer}, &add_map_tuple/2)
 
     map_schema =
       map_schema
@@ -220,59 +242,79 @@ defmodule Packer do
     {[{@c_map, map_schema} | schema], buffer}
   end
 
-  defp add_map_tuple({key, value}, {schema, buffer}) do
-    {[key_schema], buffer} = e([], buffer, key)
-    {[value_schema], buffer} = e([], buffer, value)
-    #IO.inspect(buffer, label: "add map tuple")
-    {[{key_schema, value_schema} | schema], buffer}
+  defp add_map_tuple({key, value}, {opts, schema, buffer}) do
+    {[key_schema], buffer} = encode_one(opts, [], buffer, key)
+    {[value_schema], buffer} = encode_one(opts, [], buffer, value)
+    {opts, [{key_schema, value_schema} | schema], buffer}
   end
 
-  defp add_tuple(schema, buffer, _tuple, arity, count) when count >= arity do
+  defp add_tuple(_opts, schema, buffer, _tuple, arity, count) when count >= arity do
     {schema, buffer}
   end
 
-  defp add_tuple(schema, buffer, tuple, arity, count) do
+  defp add_tuple(opts, schema, buffer, tuple, arity, count) do
     {tuple_schema, tuple_buffer} =
       tuple
       |> elem(count)
-      |> (fn x -> e(schema, buffer, x) end).()
-    add_tuple(tuple_schema, tuple_buffer, tuple, arity, count + 1)
+      |> (fn x -> encode_one(opts, schema, buffer, x) end).()
+    add_tuple(opts, tuple_schema, tuple_buffer, tuple, arity, count + 1)
   end
 
-  defp add_list(schema, buffer, []) do
+  defp add_list(_opts, schema, buffer, []) do
     {Enum.reverse(schema), buffer}
   end
 
-  defp add_list(schema, buffer, [next | rest]) do
-    {schema, buffer} = e(schema, buffer, next)
-    add_list(schema, buffer, rest)
+  defp add_list(opts, schema, buffer, [next | rest]) do
+    {schema, buffer} = encode_one(opts, schema, buffer, next)
+    add_list(opts, schema, buffer, rest)
   end
 
-  defp add_integer(schema, buffer, t) when t >= 0 and t <=255 do
-    {[@c_small_int | schema], buffer <> <<t :: 8-unsigned-integer>>}
+  defp add_integer(opts, schema, buffer, t) when t >= 0 and t <=255 do
+    if Keyword.get(opts, :small_int, true) do
+      {[@c_small_int | schema], buffer <> <<t :: 8-unsigned-integer>>}
+    else
+      {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
+    end
   end
 
-  defp add_integer(schema, buffer, t) when t >= -127 and t < 0 do
-    {[@c_small_uint | schema], buffer <> <<t :: 8-signed-integer>>}
+  defp add_integer(opts, schema, buffer, t) when t >= -127 and t < 0 do
+    if Keyword.get(opts, :small_int, true) do
+      {[@c_small_uint | schema], buffer <> <<t :: 8-signed-integer>>}
+    else
+      {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
+    end
   end
 
-  defp add_integer(schema, buffer, t) when t >= 0 and t <= 65_535 do
+  defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 65_535 do
     {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
   end
 
-  defp add_integer(schema, buffer, t) when t >= -32_767 and t < 0 do
+  defp add_integer(_opts, schema, buffer, t) when t >= -32_767 and t < 0 do
     {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
   end
 
-  defp add_integer(schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
+  defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
     {[@c_int | schema], buffer <> <<t :: 32-unsigned-integer>>}
   end
 
-  defp add_integer(schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
+  defp add_integer(_opts, schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
     {[@c_uint | schema], buffer <> <<t :: 32-signed-integer>>}
   end
 
-  defp add_integer(schema, buffer, t) do
+  defp add_integer(_opts, schema, buffer, t) do
     {[@c_big_int | schema], buffer <> <<t :: 64-signed-integer>>}
+  end
+
+  defp compress(:zlib, buffer) do
+      z = :zlib.open()
+      :ok = :zlib.deflateInit(z)
+      compressed_buffer = :zlib.deflate(z, buffer, :finish) |> :erlang.list_to_binary()
+      :ok = :zlib.deflateEnd(z)
+      :zlib.close(z)
+      compressed_buffer
+  end
+
+  defp compress(:brotli, buffer) do
+      :brotli.encode(buffer)
   end
 end
