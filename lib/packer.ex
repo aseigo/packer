@@ -317,8 +317,4 @@ defmodule Packer do
   def compress(:zstd, buffer) do
       :zstd.compress(buffer, 5)
   end
-
-  def compress(:brotli, buffer) do
-      :brotli.encode(buffer)
-  end
 end

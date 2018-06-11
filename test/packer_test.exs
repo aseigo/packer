@@ -8,15 +8,19 @@ defmodule PackerTestMacros do
     quote do
       packed = Packer.encode(unquote(unpacked), unquote(opts))
       [gen_schema, compressed_buffer] = packed
+      #IO.inspect(compressed_buffer)
       assert gen_schema === unquote(schema)
-      assert PackerTestMacros.decompress(:zlib, compressed_buffer) === unquote(encoded_term)
+      assert PackerTestMacros.decompress(:zstd, compressed_buffer) === unquote(encoded_term)
       assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
       #Logger.debug("Line #{unquote(line)} => sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
     end
   end
 
-  def decompress(:brotli, buffer) do
-    :brotli.decode(buffer)
+  def decompress(:zstd, buffer) do
+    case :zstd.decompress(buffer) do
+      :error -> buffer
+      res -> res
+    end
   end
 
   def decompress(:zlib, buffer) do
