@@ -1,4 +1,5 @@
 %{
   "brotli": {:hex, :brotli, "0.2.0", "0af410b34645ddf479baab593bed1f3ed56e54f57654a456a1db2dfc3846917c", [:rebar3], [], "hexpm"},
   "remix": {:hex, :remix, "0.0.2", "f06115659d8ede8d725fae1708920ef73353a1b39efe6a232d2a38b1f2902109", [:mix], [], "hexpm"},
+  "zstd": {:hex, :zstd, "0.2.0", "2eeb18d6cf9d725cdce1ba37eaed59d1f701599f9f82844e77f50c30c74fd4ab", [:rebar3], [], "hexpm"},
 }

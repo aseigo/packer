@@ -62,8 +62,8 @@ defmodule Packer do
 
     compress? = Keyword.get(opts, :compress, true)
     if compress? do
-      compressed_buffer = compress(:zlib, buffer)
-      IO.puts("#{byte_size(compressed_buffer)} < #{byte_size(buffer)}")
+      compressed_buffer = compress(:zstd, buffer)
+      #IO.puts("#{byte_size(compressed_buffer)} < #{byte_size(buffer)}")
       if byte_size(compressed_buffer) < byte_size(buffer) do
         encoded_iodata(encoded_schema, compressed_buffer, opts)
       else
@@ -305,7 +305,7 @@ defmodule Packer do
     {[@c_big_int | schema], buffer <> <<t :: 64-signed-integer>>}
   end
 
-  defp compress(:zlib, buffer) do
+  def compress(:zlib, buffer) do
       z = :zlib.open()
       :ok = :zlib.deflateInit(z)
       compressed_buffer = :zlib.deflate(z, buffer, :finish) |> :erlang.list_to_binary()
@@ -314,7 +314,11 @@ defmodule Packer do
       compressed_buffer
   end
 
-  defp compress(:brotli, buffer) do
+  def compress(:zstd, buffer) do
+      :zstd.compress(buffer, 5)
+  end
+
+  def compress(:brotli, buffer) do
       :brotli.encode(buffer)
   end
 end
