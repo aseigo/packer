@@ -7,7 +7,7 @@ defmodule PackerTestMacros do
     #line = __CALLER__.line
     quote do
       packed = Packer.encode(unquote(unpacked), unquote(opts))
-      [gen_schema, compressed_buffer] = packed
+      [_header, gen_schema, compressed_buffer] = packed
       #IO.inspect(compressed_buffer)
       assert gen_schema === unquote(schema)
       assert PackerTestMacros.decompress(:zstd, compressed_buffer) === unquote(encoded_term)
