@@ -1,20 +1,4 @@
 defmodule Packer do
-
-  # TODO
-  #
-  # * schema compression actually inflates the size of encode({1, 2})
-  #
-  # * implement @c_huge_int
-  #
-  # * compressing the schema probably should be done while building the schema
-  #   to avoid going through it more than once.
-  #   this would perhaps open up additional opportunities for efficiency when
-  #   small and not-so-small numbers end up alternating
-  #
-  # * consider adding a "this list is just small numbers" to save a few bytes
-  #   this is a trick :erlang.term_to_binary employs, implying such lists are
-  #   super common enough to warrant a unique id and saving an extra byte or two
-
   @doc """
   Encodes a term. Returns an array with the version-specific magic string, the
   data schema, and buffer.
