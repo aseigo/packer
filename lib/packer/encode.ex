@@ -9,28 +9,26 @@ defmodule Packer.Encode do
                      |> encode_schema()
 
     compress? = Keyword.get(opts, :compress, true)
+    header_type = Keyword.get(opts, :header, :version)
     if compress? do
-      compressed_buffer = :zstd.compress(buffer, 5)
+      compressed_buffer = buffer#:zstd.compress(buffer, 5)
       #IO.puts("#{byte_size(compressed_buffer)} < #{byte_size(buffer)}")
       if byte_size(compressed_buffer) < byte_size(buffer) do
-        encoded_iodata(encoded_schema, compressed_buffer, opts)
+        encoded_iodata(encoded_schema, compressed_buffer, header_type)
       else
-        encoded_iodata(encoded_schema, buffer, opts)
+        encoded_iodata(encoded_schema, buffer, header_type)
       end
     else
-      encoded_iodata(encoded_schema, buffer, opts)
+      encoded_iodata(encoded_schema, buffer, header_type)
     end
   end
 
-  def encoded_term_header(), do: @c_header
+  def encoded_term_header(:full), do: @c_full_header
+  def encoded_term_header(:version), do: @c_version_header
 
-  defp encoded_iodata(schema, buffer, opts) do
-    if Keyword.get(opts, :header, false) do
-      [@c_header, schema, buffer]
-    else
-      [schema, buffer]
-    end
-  end
+  defp encoded_iodata(schema, buffer, :none), do: [schema, buffer]
+  defp encoded_iodata(schema, buffer, :full), do: [@c_full_header, schema, buffer]
+  defp encoded_iodata(schema, buffer, :version), do: [@c_version_header, schema, buffer]
 
   defp encode_schema(schema) do
     Enum.reduce(schema, <<>>, &encode_schema/2)

@@ -21,7 +21,8 @@ defmodule Packer do
   defdelegate encode(term, opts \\ []), to: Packer.Encode, as: :from_term
 
   @doc """
-  Returns the magic string header prepended to encodings
+  Returns the magic string header prepended to encodings. The type parameter can be either
+  :full or :version
   """
-  defdelegate encoded_term_header(), to: Packer.Encode
+  defdelegate encoded_term_header(type \\ :version), to: Packer.Encode
 end

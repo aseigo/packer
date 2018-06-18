@@ -25,7 +25,8 @@ defmodule Packer.Defs do
       #@c_repeat_up   0b10100100
 
       @c_max_short_tuple 0b01111111 - 0b01000000
-      @c_header <<0x45, 0x50, 0x4B, 0x52, 0x00, 0x01>> # 'EPKR01'
+      @c_version_header <<0x01>> # '01'
+      @c_full_header <<0x45, 0x50, 0x4B, 0x52, 0x01>> # 'EPKR01'
     end
   end
 end
