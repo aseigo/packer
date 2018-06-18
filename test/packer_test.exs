@@ -133,8 +133,11 @@ defmodule PackerTest do
   end
 
   test "magic header bytes are optional" do
-    [header , _, _] = Packer.encode(1, header: true)
-    assert Packer.encoded_term_header() === header
-    assert 2 === Enum.count(Packer.encode(1))
+    [header, _, _] = Packer.encode(1, header: :full)
+    assert Packer.encoded_term_header(:full) === header
+    [header, _, _] = Packer.encode(1, header: :version)
+    assert Packer.encoded_term_header(:version) === header
+    assert 2 === Enum.count(Packer.encode(1, header: :none))
+    assert 3 === Enum.count(Packer.encode(1))
   end
 end
