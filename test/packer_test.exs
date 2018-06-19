@@ -147,6 +147,11 @@ defmodule PackerTest do
     assert Packer.decode([Packer.encoded_term_header(:full), [], <<>>]) === {:error, :bad_header}
   end
 
+  test "unpacking with no define header type works with a version header" do
+    assert Packer.decode([Packer.encoded_term_header(:full), [], <<>>]) === {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(), [], <<>>]) !== {:error, :bad_header}
+  end
+
   test "unpacks primitives" do
     M.decoding(0)
     M.decoding(1)
