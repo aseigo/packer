@@ -21,8 +21,24 @@ defmodule Packer do
   defdelegate encode(term, opts \\ []), to: Packer.Encode, as: :from_term
 
   @doc """
-  Returns the magic string header prepended to encodings. The type parameter can be either
-  :full or :version
+  Decodes iodata to a term. The output of Packer.encode/2 is expected, and this function is
+  indeed symetric to Packer.encode/2. It also supports a similar set of options:
+
+  * compress: boolean, defaults to true; if the payload was not compressed, leaving this as
+    true will be less efficient but should not be harmful
+  * header: the type of header that is expected, from :version (the default), :full, or :none
+  """
+  @spec decode(data :: iodata(), opts :: decode_options()) :: any()
+  @type decode_options() :: [
+                             {:compress, boolean},
+                             {:header, :version | :full | :none}
+                            ]
+  defdelegate decode(data, opts), to: Packer.Decode, as: :from_iodata
+
+  @doc """
+  Returns the magic string header prepended to encodings. The type parameter can be :none,
+  :full or :version. The default is :version, which is a minimal prefix of one byte containing
+  the version of the encoding.
   """
   defdelegate encoded_term_header(type \\ :version), to: Packer.Encode
 end
