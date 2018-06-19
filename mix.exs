@@ -19,8 +19,9 @@ defmodule Pack.MixProject do
 
   defp deps do
     [
+      {:zstd, "~> 0.2.0"},
       {:remix, "~> 0.0.2", only: [:dev]},
-      {:zstd, "~> 0.2.0"}
+      {:ex_doc, "~> 0.18.3", only: [:dev]}
     ]
   end
 end
