@@ -11,7 +11,7 @@ defmodule Packer.Encode do
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
     if compress? do
-      compressed_buffer = buffer#:zstd.compress(buffer, 5)
+      compressed_buffer = :zstd.compress(buffer, 5)
       #IO.puts("#{byte_size(compressed_buffer)} < #{byte_size(buffer)}")
       if byte_size(compressed_buffer) < byte_size(buffer) do
         encoded_iodata(encoded_schema, compressed_buffer, header_type)
