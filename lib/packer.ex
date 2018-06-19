@@ -17,7 +17,11 @@ defmodule Packer do
     ** :none -> no header; fewer bytes, less safety. buckle up, cowboy!
   """
   @spec encode(term :: any(), opts :: encode_options()) :: iolist()
-  @type encode_options() :: [{:compress, boolean}, {:short_int, boolean}]
+  @type encode_options() :: [
+                             {:compress, boolean},
+                             {:short_int, boolean},
+                             {:header, :version | :full | :none}
+                            ]
   defdelegate encode(term, opts \\ []), to: Packer.Encode, as: :from_term
 
   @doc """
@@ -40,5 +44,6 @@ defmodule Packer do
   :full or :version. The default is :version, which is a minimal prefix of one byte containing
   the version of the encoding.
   """
+  @spec encoded_term_header(type :: :none | :full | :version) :: String.t()
   defdelegate encoded_term_header(type \\ :version), to: Packer.Encode
 end
