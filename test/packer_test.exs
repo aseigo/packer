@@ -3,9 +3,10 @@ defmodule Foo do
 end
 
 defmodule PackerTest.Expect do
-  defmacro decoding(encoded, term, opts \\ []) do
+  defmacro decoding(term, opts \\ []) do
     quote do
-      assert Packer.decode(unquote(encoded), unquote(opts)) === unquote(term)
+      roundtrip = Packer.encode(unquote(term), unquote(opts)) |> Packer.decode(unquote(opts))
+      assert roundtrip === unquote(term)
     end
   end
 
@@ -127,5 +128,39 @@ defmodule PackerTest do
     assert Packer.encoded_term_header(:version) === header
     assert 2 === Enum.count(Packer.encode(1, header: :none))
     assert 3 === Enum.count(Packer.encode(1))
+  end
+
+  test "unpacking with no header fails without `header: :none`" do
+    assert Packer.decode([[], <<>>]) === {:error, :bad_header}
+  end
+
+  test "unpacking with `header: :none` fails if there is a header" do
+    assert Packer.decode([Packer.encoded_term_header(), [], <<>>], header: :none) === {:error, :bad_header}
+  end
+
+  test "unpacking with wrong version header fails" do
+    assert Packer.decode([<<>>, [], <<>>]) === {:error, :bad_header}
+  end
+
+  test "unpacking with full header requires `header: :full`" do
+    assert Packer.decode([Packer.encoded_term_header(:full), [], <<>>], header: :full) != {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(:full), [], <<>>]) === {:error, :bad_header}
+  end
+
+  test "unpacks primitives" do
+    M.decoding(0)
+    M.decoding(1)
+    M.decoding(-1)
+    M.decoding(-126)
+    M.decoding(257)
+    M.decoding(-512)
+    M.decoding(1_000_000)
+    M.decoding(-1_000_000)
+    M.decoding(1_000_000_000_000)
+    M.decoding(-1_000_000_000_0000)
+    M.decoding("b")
+    M.decoding("binary")
+    M.decoding(3.14)
+    M.decoding(:atom)
   end
 end
