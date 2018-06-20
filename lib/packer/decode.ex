@@ -1,3 +1,5 @@
+#ifndef DECODE_EX
+#define DECODE_EX
 defmodule Packer.Decode do
   use Packer.Defs
 
@@ -42,6 +44,8 @@ defmodule Packer.Decode do
     debuffer_one(type, rem_schema, buffer, opts)
   end
 
+  defp decode_one(_, _, _), do: {:error, :unexpected_data}
+
   decode_primitive(@c_small_int, 1, 8-signed-integer, 0)
   decode_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
   decode_primitive(@c_short_int, 2, 16-signed-integer, 0)
@@ -57,7 +61,7 @@ defmodule Packer.Decode do
   decode_binary(@c_binary_2, 16)
   decode_binary(@c_binary_4, 32)
 
-  defp decode_one(_, _, _), do: {:error, :unexpected_data}
+  defp debuffer_one(_type, _schema, _buffer, _opts), do: {:error, :unhandled_debuf_type}
 
   defp decode_next_list_item(<<>>, buffer, opts, acc) do
     decoded(<<>>, buffer, opts, Enum.reverse(acc))
@@ -91,3 +95,4 @@ defmodule Packer.Decode do
     decode_n_list_items(type, rem_schema, rem_buffer, opts, [term | acc], count - 1)
   end
 end
+#endif // DECODE_EX
