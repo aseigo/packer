@@ -40,4 +40,5 @@ defmodule Packer.Decode do
   decode_primitive(@c_uint, 4, 32-unsigned-integer, 0)
   decode_primitive(@c_big_int, 8, 64-signed-integer, 0)
   decode_primitive(@c_byte, 1, 8-bits, "")
+  decode_primitive(@c_float, 8, 64-float, 0.0)
 end
