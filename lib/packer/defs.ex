@@ -58,4 +58,58 @@ defmodule Packer.Defs do
       end
     end
   end
+
+  # NOTE:
+  # there is some dusky magic in the follownig macro, but boy does it help make the decode module short
+  # each invocation creates two functions, one that is a helper to avoid yet another level of nesting.
+  # the complexity mostly comes from the fact that this can handle both the needs of atom and binary
+  # decoding ...
+  defmacro decode_binary(type, length_encoding_size, default_on_fail \\ :consume_rest, fun \\ nil) do
+    final_term =
+      if fun == nil do
+        quote do
+          term
+        end
+      else
+        quote do
+          unquote(fun).(term)
+        end
+      end
+
+    on_fail =
+      if default_on_fail == :consume_rest do
+        quote do
+          buffer
+        end
+     else
+        default_on_fail
+      end
+
+
+    fn_name =
+      type
+      |> (fn {_, _, [{x, _, _}]} -> x end).()
+      |> Atom.to_string
+      |> (fn l -> l <> "_decode_helper" end).()
+      |> String.to_atom
+
+    quote do
+      defp decode_one(<<unquote(type), rem_schema :: binary>>, buffer, opts) do
+        unquote(fn_name)(rem_schema, buffer, opts)
+      end
+
+      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
+        if byte_size(buffer) < size do
+          decoded(rem_schema, <<>>, opts, unquote(on_fail))
+        else
+          {term, rem_buffer} = String.split_at(buffer, size)
+          decoded(rem_schema, rem_buffer, opts, unquote(final_term))
+        end
+      end
+
+      defp unquote(fn_name)(_schema, buffer, opts) do
+        decoded(<<>>, buffer, opts, <<>>)
+      end
+    end
+  end
 end
