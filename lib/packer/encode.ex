@@ -60,7 +60,7 @@ defmodule Packer.Encode do
           encode_schema(value, e)
       end)
 
-    acc <> <<@c_map:: 8-unsigned-integer>> <> encoded_elements <> <<@c_collect_end>>
+    acc <> <<@c_map:: 8-unsigned-integer>> <> encoded_elements <> <<@c_collection_end>>
   end
 
   defp encode_schema({:rep, @c_repeat_1, reps}, acc) do
@@ -76,7 +76,7 @@ defmodule Packer.Encode do
   end
 
   defp encode_schema({code, elements}, acc) when is_list(elements) do
-    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<@c_collect_end>>
+    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<@c_collection_end>>
   end
 
   defp encode_schema({code, length}, acc) do
