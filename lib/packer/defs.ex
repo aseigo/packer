@@ -45,10 +45,10 @@ defmodule Packer.Defs do
     end
   end
 
-  defmacro decode_primitive(type, size, binary_desc, default_on_fail) do
+  defmacro decode_primitive(type, length_bytes, binary_desc, default_on_fail) do
     quote do
       defp decode_one(<<unquote(type), rem_schema :: binary>>, buffer, opts) do
-        if byte_size(buffer) < unquote(size) do
+        if byte_size(buffer) < unquote(length_bytes) do
           decoded(rem_schema, <<>>, opts, unquote(default_on_fail))
         else
           <<term :: unquote(binary_desc), rem_buffer :: binary>> = buffer
