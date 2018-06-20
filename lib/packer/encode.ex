@@ -213,34 +213,34 @@ defmodule Packer.Encode do
 
   defp add_integer(opts, schema, buffer, t) when t >= 0 and t <=255 do
     if Keyword.get(opts, :small_int, true) do
-      {[@c_small_int | schema], buffer <> <<t :: 8-unsigned-integer>>}
+      {[@c_small_uint | schema], buffer <> <<t :: 8-unsigned-integer>>}
     else
-      {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
+      {[@c_short_uint | schema], buffer <> <<t :: 16-unsigned-integer>>}
     end
   end
 
   defp add_integer(opts, schema, buffer, t) when t >= -127 and t < 0 do
     if Keyword.get(opts, :small_int, true) do
-      {[@c_small_uint | schema], buffer <> <<t :: 8-signed-integer>>}
+      {[@c_small_int | schema], buffer <> <<t :: 8-signed-integer>>}
     else
-      {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
+      {[@c_short_int | schema], buffer <> <<t :: 16-signed-integer>>}
     end
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 65_535 do
-    {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
+    {[@c_short_uint | schema], buffer <> <<t :: 16-unsigned-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= -32_767 and t < 0 do
-    {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
+    {[@c_short_int | schema], buffer <> <<t :: 16-signed-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
-    {[@c_int | schema], buffer <> <<t :: 32-unsigned-integer>>}
+    {[@c_uint | schema], buffer <> <<t :: 32-unsigned-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
-    {[@c_uint | schema], buffer <> <<t :: 32-signed-integer>>}
+    {[@c_int | schema], buffer <> <<t :: 32-signed-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) do
