@@ -6,8 +6,8 @@ defmodule PackerTest.Expect do
   defmacro decoding(term, opts \\ []) do
     quote do
       roundtrip = Packer.encode(unquote(term), unquote(opts)) |> Packer.decode(unquote(opts))
-      IO.inspect(unquote(term), label: "Input term")
-      IO.inspect(roundtrip, label: "Decoded")
+      #IO.inspect(unquote(term), label: "Input term")
+      #IO.inspect(roundtrip, label: "Decoded")
       assert roundtrip === unquote(term)
     end
   end
