@@ -207,4 +207,11 @@ defmodule PackerTest do
     M.decoding([1, 2, 3, 4, 5, 6, 7000])
     M.decoding([1, :atom, "binary"])
   end
+
+  test "unpacks nested lists" do
+    M.decoding([[]])
+    M.decoding([[1]])
+    M.decoding([1, [1], 2])
+    M.decoding([1, [1, [], [:atom, [3]]], 2])
+  end
 end
