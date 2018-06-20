@@ -214,4 +214,8 @@ defmodule PackerTest do
     M.decoding([1, [1], 2])
     M.decoding([1, [1, [], [:atom, [3]]], 2])
   end
+
+  test "unpacks tuples" do
+    M.decoding({1, 2})
+  end
 end

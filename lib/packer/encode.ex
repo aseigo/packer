@@ -1,6 +1,5 @@
 defmodule Packer.Encode do
   use Packer.Defs
-  use Bitwise
 
   def from_term(term, opts) do
     {schema, buffer} = encode_one(opts, [], <<>>, term)

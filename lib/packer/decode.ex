@@ -41,7 +41,12 @@ defmodule Packer.Decode do
   end
 
   defp decode_one(<<type :: 8-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
-    debuffer_one(type, rem_schema, buffer, opts)
+    if Packer.Utils.is_tuple_type?(type) do
+      {arity, rem_schema} = Packer.Utils.tuple_arity(type, rem_schema)
+      decode_next_tuple_item(rem_schema, buffer, opts, arity, {})
+    else
+      debuffer_one(type, rem_schema, buffer, opts)
+    end
   end
 
   defp decode_one(_, _, _), do: {:error, :unexpected_data}
@@ -93,6 +98,34 @@ defmodule Packer.Decode do
   defp decode_n_list_items(type, schema, buffer, opts, acc, count) do
     {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer, opts)
     decode_n_list_items(type, rem_schema, rem_buffer, opts, [term | acc], count - 1)
+  end
+
+  defp decode_next_tuple_item(schema, buffer, opts, 0, acc), do: decoded(schema, buffer, opts, acc)
+
+  defp decode_next_tuple_item(<<@c_repeat_1, rem_schema :: binary>>, buffer, opts, count, acc) do
+    if byte_size(buffer) < 1 do
+      #TODO is it really right to just ignore it at this point?
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<rep_count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      decode_n_tuple_items(type, rem_schema, buffer, opts, count, acc, rep_count)
+    end
+  end
+
+  defp decode_next_tuple_item(schema, buffer, opts, count, acc) do
+    {rem_schema, rem_buffer, term} = decode_one(schema, buffer, opts)
+    acc = Tuple.append(acc, term)
+    decode_next_tuple_item(rem_schema, rem_buffer, opts, count - 1, acc)
+  end
+
+  defp decode_n_tuple_items(_type, schema, buffer, opts, count, acc, 0) do
+    decode_next_tuple_item(schema, buffer, opts, count, acc)
+  end
+
+  defp decode_n_tuple_items(type, schema, buffer, opts, count, acc, rep_count) do
+    {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer, opts)
+    acc = Tuple.append(acc, term)
+    decode_n_tuple_items(type, rem_schema, rem_buffer, opts, count - 1, acc, rep_count - 1)
   end
 end
 #endif // DECODE_EX

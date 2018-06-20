@@ -1,4 +1,22 @@
 defmodule Packer.Utils do
+  use Packer.Defs
+  use Bitwise
+
+  def is_tuple_type?(type) do
+    (type &&& @c_tuple) == @c_tuple
+  end
+
+  def tuple_arity(type, schema) do
+    arity = type &&& @c_tuple_arity_mask
+    if (arity >= @c_max_short_tuple) do
+      #FIXME: if the schema does not have any more bytes?
+      <<arity :: 16-unsigned-integer, rem_schema :: binary>> = schema
+      {arity, rem_schema}
+    else
+      {arity, schema}
+    end
+  end
+
   def compress(buffer) do
     :zstd.compress(buffer, 5)
   end
