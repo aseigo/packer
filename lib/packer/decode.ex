@@ -48,4 +48,6 @@ defmodule Packer.Decode do
   decode_binary(@c_binary_1, 8)
   decode_binary(@c_binary_2, 16)
   decode_binary(@c_binary_4, 32)
+
+  defp decode_one(_, _, _), do: {:error, :unexpected_data}
 end
