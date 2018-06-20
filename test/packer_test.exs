@@ -35,7 +35,7 @@ defmodule PackerTest do
 
   @tag :packer
 
-  test "packs individual primitives" do
+  test "packs numbers" do
     M.encoding(0, <<2>>, <<0>>)
     M.encoding(1, <<2>>, <<1>>)
     M.encoding(-1, <<1>>, <<255>>)
@@ -159,7 +159,7 @@ defmodule PackerTest do
     assert Packer.decode([Packer.encoded_term_header(), <<>>, <<>>]) !== {:error, :bad_header}
   end
 
-  test "unpacks primitives" do
+  test "unpacks numbers" do
     M.decoding(0)
     M.decoding(1)
     M.decoding(-1)
