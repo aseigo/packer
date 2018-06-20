@@ -47,9 +47,23 @@ defmodule PackerTest do
     M.encoding(1_000_000_000_000, <<7>>, <<0, 0, 0, 232, 212, 165, 16, 0>>)
     M.encoding(-1_000_000_000_0000, <<7>>, <<255, 255, 246, 231, 177, 141, 96, 0>>)
     M.encoding("b", <<9>>, "b")
-    M.encoding("binary", <<10, 0, 0, 0, 6>>, "binary")
-    M.encoding(3.14, <<11>>, <<64, 9, 30, 184, 81, 235, 133, 31>>)
-    M.encoding(:atom, <<12, 4>>, "atom")
+    M.encoding(3.14, <<9>>, <<64, 9, 30, 184, 81, 235, 133, 31>>)
+    M.encoding(:atom, <<14, 4>>, "atom")
+  end
+
+  test "packs short binaries" do
+    binary = "binary"
+    M.encoding(binary, <<11, 6>>, binary)
+  end
+
+  test "packs medium binaries" do
+    binary = String.duplicate("f", 30_000)
+    M.encoding(binary, <<12, 30_000 :: unsigned-16-integer>>, binary)
+  end
+
+  test "packs long binaries" do
+    binary = String.duplicate("f", 300_000)
+    M.encoding(binary, <<13, 300_000 :: unsigned-32-integer>>, binary)
   end
 
   test "packs flat lists" do
@@ -156,9 +170,27 @@ defmodule PackerTest do
     M.decoding(-1_000_000)
     M.decoding(1_000_000_000_000)
     M.decoding(-1_000_000_000_0000)
-    M.decoding("b")
     M.decoding(3.14)
-    #M.decoding("binary")
+  end
+
+  test "unpacks a byte" do
+    M.decoding("b")
+  end
+
+  test "unpacks atoms" do
     M.decoding(:atom)
+    #TODO: poorly formed buffers should return nil
+  end
+
+  test "unpacks short binaries" do
+    M.decoding("binary")
+  end
+
+  test "unpacks medium binaries" do
+    String.duplicate("f", 30_000) |> M.decoding()
+  end
+
+  test "unpacks long binaries" do
+    String.duplicate("f", 300_000) |> M.decoding()
   end
 end
