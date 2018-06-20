@@ -32,7 +32,7 @@ defmodule Packer.Decode do
   defp decoded(<<>>, _buffer, _opts, term), do: term
   defp decoded(schema, buffer, opts, term), do: decode_one(schema, buffer, opts)
 
-  defp decode_one(<<>>, _buffer, _opts), do: :empty
+  defp decode_one(<<>>, _buffer, _opts), do: {:error, :empty}
 
   decode_primitive(@c_small_int, 1, 8-signed-integer, 0)
   decode_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
