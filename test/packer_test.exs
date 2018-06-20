@@ -150,13 +150,13 @@ defmodule PackerTest do
   end
 
   test "unpacking with full header requires `header: :full`" do
-    assert Packer.decode([Packer.encoded_term_header(:full), <<>>, <<>>], header: :full) != {:error, :bad_header}
-    assert Packer.decode([Packer.encoded_term_header(:full), <<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>], header: :full) != {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
   end
 
-  test "unpacking with no define header type works with a version header" do
-    assert Packer.decode([Packer.encoded_term_header(:full), <<>>, <<>>]) === {:error, :bad_header}
-    assert Packer.decode([Packer.encoded_term_header(), <<>>, <<>>]) !== {:error, :bad_header}
+  test "unpacking with no defined header type works with a version header" do
+    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(), <<2>>, <<1>>]) !== {:error, :bad_header}
   end
 
   test "unpacks numbers" do
@@ -199,5 +199,19 @@ defmodule PackerTest do
 
   test "unpacks a partial buffer when there are not enough bytes" do
     assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13, 300_000 :: unsigned-32-integer>>, "too short"])
+  end
+
+  test "unpacks flat lists" do
+    M.decoding([])
+    M.decoding([1])
+    M.decoding([1, 2, 3, 4, 5, 6, 7000])
+    M.decoding([1, :atom, "binary"])
+  end
+
+  test "unpacks nested lists" do
+    M.decoding([[]])
+    M.decoding([[1]])
+    M.decoding([1, [1], 2])
+    M.decoding([1, [1, [], [:atom, [3]]], 2])
   end
 end

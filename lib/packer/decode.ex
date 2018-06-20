@@ -5,7 +5,8 @@ defmodule Packer.Decode do
     header_type = Keyword.get(opts, :header, :version)
     if check_header(header_type, header) do
       decompressed_buffer = Packer.Utils.decompress(buffer)
-      decode_one(schema, decompressed_buffer, opts)
+      {_rem_schema, _rem_buffer, term} = decode_one(schema, decompressed_buffer, opts)
+      term
     else
       {:error, :bad_header}
     end
@@ -29,10 +30,17 @@ defmodule Packer.Decode do
 
   defp check_header(_type, _header), do: false
 
-  defp decoded(<<>>, _buffer, _opts, term), do: term
-  defp decoded(schema, buffer, opts, term), do: decode_one(schema, buffer, opts)
+  defp decoded(schema, buffer, _opts, term), do: {schema, buffer, term}
 
-  defp decode_one(<<>>, _buffer, _opts), do: {:error, :empty}
+  defp decode_one(<<>>, _buffer, _opts), do: {:error, :empty_header}
+
+  defp decode_one(<<@c_list, rem_schema :: binary>>, buffer, opts) do
+    decode_next_list_item(rem_schema, buffer, opts, [])
+  end
+
+  defp decode_one(<<type :: 8-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
+    debuffer_one(type, rem_schema, buffer, opts)
+  end
 
   decode_primitive(@c_small_int, 1, 8-signed-integer, 0)
   decode_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
@@ -50,4 +58,36 @@ defmodule Packer.Decode do
   decode_binary(@c_binary_4, 32)
 
   defp decode_one(_, _, _), do: {:error, :unexpected_data}
+
+  defp decode_next_list_item(<<>>, buffer, opts, acc) do
+    decoded(<<>>, buffer, opts, Enum.reverse(acc))
+  end
+
+  defp decode_next_list_item(<<0, rem_schema :: binary>>, buffer, opts, acc) do
+    decoded(rem_schema, buffer, opts, Enum.reverse(acc))
+  end
+
+  defp decode_next_list_item(<<@c_repeat_1, rem_schema :: binary>>, buffer, opts, acc) do
+    if byte_size(buffer) < 1 do
+      #TODO is it really right to just ignore it at this point?
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      decode_n_list_items(type, rem_schema, buffer, opts, acc, count)
+    end
+  end
+
+  defp decode_next_list_item(schema, buffer, opts, acc) do
+    {rem_schema, rem_buffer, term} = decode_one(schema, buffer, opts)
+    decode_next_list_item(rem_schema, rem_buffer, opts, [term | acc])
+  end
+
+  defp decode_n_list_items(_type, schema, buffer, opts, acc, 0) do
+    decode_next_list_item(schema, buffer, opts, acc)
+  end
+
+  defp decode_n_list_items(type, schema, buffer, opts, acc, count) do
+    {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer, opts)
+    decode_n_list_items(type, rem_schema, rem_buffer, opts, [term | acc], count - 1)
+  end
 end

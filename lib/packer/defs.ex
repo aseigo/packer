@@ -47,14 +47,13 @@ defmodule Packer.Defs do
 
   defmacro decode_primitive(type, length_bytes, binary_desc, default_on_fail) do
     quote do
-      defp decode_one(<<unquote(type), rem_schema :: binary>>, buffer, opts) do
+      defp debuffer_one(unquote(type), schema, buffer, opts) do
         if byte_size(buffer) < unquote(length_bytes) do
-          decoded(rem_schema, <<>>, opts, unquote(default_on_fail))
+          decoded(schema, <<>>, opts, unquote(default_on_fail))
         else
           <<term :: unquote(binary_desc), rem_buffer :: binary>> = buffer
-          decoded(rem_schema, rem_buffer, opts, term)
+          decoded(schema, rem_buffer, opts, term)
         end
-
       end
     end
   end
@@ -94,8 +93,8 @@ defmodule Packer.Defs do
       |> String.to_atom
 
     quote do
-      defp decode_one(<<unquote(type), rem_schema :: binary>>, buffer, opts) do
-        unquote(fn_name)(rem_schema, buffer, opts)
+      defp debuffer_one(unquote(type), schema, buffer, opts) do
+        unquote(fn_name)(schema, buffer, opts)
       end
 
       defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
