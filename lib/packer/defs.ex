@@ -45,7 +45,7 @@ defmodule Packer.Defs do
     end
   end
 
-  defmacro decode_primitive(type, length_bytes, binary_desc, default_on_fail) do
+  defmacro debuffer_primitive(type, length_bytes, binary_desc, default_on_fail) do
     quote do
       defp debuffer_one(unquote(type), schema, buffer, opts) do
         if byte_size(buffer) < unquote(length_bytes) do
@@ -63,7 +63,7 @@ defmodule Packer.Defs do
   # each invocation creates two functions, one that is a helper to avoid yet another level of nesting.
   # the complexity mostly comes from the fact that this can handle both the needs of atom and binary
   # decoding ...
-  defmacro decode_binary(type, length_encoding_size, default_on_fail \\ :consume_rest, fun \\ nil) do
+  defmacro debuffer_binary(type, length_encoding_size, default_on_fail \\ :consume_rest, fun \\ nil) do
     final_term =
       if fun == nil do
         quote do

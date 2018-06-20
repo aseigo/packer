@@ -46,20 +46,20 @@ defmodule Packer.Decode do
 
   defp decode_one(_, _, _), do: {:error, :unexpected_data}
 
-  decode_primitive(@c_small_int, 1, 8-signed-integer, 0)
-  decode_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
-  decode_primitive(@c_short_int, 2, 16-signed-integer, 0)
-  decode_primitive(@c_short_uint, 2, 16-unsigned-integer, 0)
-  decode_primitive(@c_int, 4, 32-signed-integer, 0)
-  decode_primitive(@c_uint, 4, 32-unsigned-integer, 0)
-  decode_primitive(@c_big_int, 8, 64-signed-integer, 0)
-  decode_primitive(@c_byte, 1, 8-bits, "")
-  decode_primitive(@c_float, 8, 64-float, 0.0)
+  debuffer_primitive(@c_small_int, 1, 8-signed-integer, 0)
+  debuffer_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
+  debuffer_primitive(@c_short_int, 2, 16-signed-integer, 0)
+  debuffer_primitive(@c_short_uint, 2, 16-unsigned-integer, 0)
+  debuffer_primitive(@c_int, 4, 32-signed-integer, 0)
+  debuffer_primitive(@c_uint, 4, 32-unsigned-integer, 0)
+  debuffer_primitive(@c_big_int, 8, 64-signed-integer, 0)
+  debuffer_primitive(@c_byte, 1, 8-bits, "")
+  debuffer_primitive(@c_float, 8, 64-float, 0.0)
 
-  decode_binary(@c_atom, 8, nil, &String.to_atom/1)
-  decode_binary(@c_binary_1, 8)
-  decode_binary(@c_binary_2, 16)
-  decode_binary(@c_binary_4, 32)
+  debuffer_binary(@c_atom, 8, nil, &String.to_atom/1)
+  debuffer_binary(@c_binary_1, 8)
+  debuffer_binary(@c_binary_2, 16)
+  debuffer_binary(@c_binary_4, 32)
 
   defp debuffer_one(_type, _schema, _buffer, _opts), do: {:error, :unhandled_debuf_type}
 
