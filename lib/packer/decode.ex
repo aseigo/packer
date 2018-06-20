@@ -4,7 +4,8 @@ defmodule Packer.Decode do
   def from_iodata([header, schema, buffer], opts) do
     header_type = Keyword.get(opts, :header, :version)
     if check_header(header_type, header) do
-      decode_one(schema, buffer, opts)
+      decompressed_buffer = Packer.Utils.decompress(buffer)
+      decode_one(schema, decompressed_buffer, opts)
     else
       {:error, :bad_header}
     end
@@ -12,7 +13,8 @@ defmodule Packer.Decode do
 
   def from_iodata([schema, buffer], opts) do
     if Keyword.get(opts, :header, :version) === :none do
-      decode_one(schema, buffer, opts)
+      decompressed_buffer = Packer.Utils.decompress(buffer)
+      decode_one(schema, decompressed_buffer, opts)
     else
       {:error, :bad_header}
     end
