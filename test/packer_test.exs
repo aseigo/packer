@@ -200,4 +200,11 @@ defmodule PackerTest do
   test "unpacks a partial buffer when there are not enough bytes" do
     assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13, 300_000 :: unsigned-32-integer>>, "too short"])
   end
+
+  test "unpacks flat lists" do
+    M.decoding([])
+    M.decoding([1])
+    M.decoding([1, 2, 3, 4, 5, 6, 7000])
+    M.decoding([1, :atom, "binary"])
+  end
 end
