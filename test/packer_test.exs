@@ -19,18 +19,9 @@ defmodule PackerTest.Expect do
       [_header, gen_schema, compressed_buffer] = packed
       #IO.inspect(compressed_buffer)
       assert gen_schema === unquote(schema)
-      assert PackerTest.Helpers.decompress(compressed_buffer) === unquote(encoded_term)
+      assert Packer.Utils.decompress(compressed_buffer) === unquote(encoded_term)
       assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
       #Logger.debug("Line #{unquote(line)} => sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
-    end
-  end
-end
-
-defmodule PackerTest.Helpers do
-  def decompress(buffer) do
-    case :zstd.decompress(buffer) do
-      :error -> buffer
-      res -> res
     end
   end
 end
