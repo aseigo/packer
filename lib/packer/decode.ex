@@ -4,7 +4,7 @@ defmodule Packer.Decode do
   def from_iodata([header, schema, buffer], opts) do
     header_type = Keyword.get(opts, :header, :version)
     if check_header(header_type, header) do
-      decode(schema, buffer, opts)
+      decode_one(schema, buffer, opts)
     else
       {:error, :bad_header}
     end
@@ -12,7 +12,7 @@ defmodule Packer.Decode do
 
   def from_iodata([schema, buffer], opts) do
     if Keyword.get(opts, :header, :version) === :none do
-      decode(schema, buffer, opts)
+      decode_one(schema, buffer, opts)
     else
       {:error, :bad_header}
     end
@@ -27,7 +27,17 @@ defmodule Packer.Decode do
 
   defp check_header(type, header), do: false
 
-  defp decode(schema, buffer, opts) do
-    []
-  end
+  defp decoded(<<>>, _buffer, _opts, term), do: term
+  defp decoded(schema, buffer, opts, term), do: decode_one(schema, buffer, opts)
+
+  defp decode_one(<<>>, _buffer, _opts), do: :empty
+
+  decode_primitive(@c_small_int, 1, 8-signed-integer, 0)
+  decode_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
+  decode_primitive(@c_short_int, 2, 16-signed-integer, 0)
+  decode_primitive(@c_short_uint, 2, 16-unsigned-integer, 0)
+  decode_primitive(@c_int, 4, 32-signed-integer, 0)
+  decode_primitive(@c_uint, 4, 32-unsigned-integer, 0)
+  decode_primitive(@c_big_int, 8, 64-signed-integer, 0)
+  decode_primitive(@c_byte, 1, 8-bits, "")
 end
