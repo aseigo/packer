@@ -179,7 +179,10 @@ defmodule PackerTest do
 
   test "unpacks atoms" do
     M.decoding(:atom)
-    #TODO: poorly formed buffers should return nil
+  end
+
+  test "poorly formed buffers the schema says should contain an atom return nil" do
+    assert nil === Packer.decode([Packer.encoded_term_header(), <<14, 300>>, "too short"])
   end
 
   test "unpacks short binaries" do
@@ -192,5 +195,9 @@ defmodule PackerTest do
 
   test "unpacks long binaries" do
     String.duplicate("f", 300_000) |> M.decoding()
+  end
+
+  test "unpacks a partial buffer when there are not enough bytes" do
+    assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13, 300_000 :: unsigned-32-integer>>, "too short"])
   end
 end
