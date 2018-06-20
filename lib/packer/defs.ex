@@ -1,6 +1,8 @@
 defmodule Packer.Defs do
   defmacro __using__(_) do
     quote do
+      import Packer.Defs
+
       @c_small_int   0x01 # 1 byte
       @c_small_uint  0x02 # 1 byte
       @c_short_int   0x03 # 2 bytes
@@ -38,6 +40,20 @@ defmodule Packer.Defs do
       @c_version_header <<0x01>> # '01'
       @c_full_header <<0x45, 0x50, 0x4B, 0x52, 0x01>> # 'EPKR1'
       @c_full_header_prefix <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
+    end
+  end
+
+  defmacro decode_primitive(type, size, binary_desc, default_on_fail) do
+    quote do
+      defp decode_one(<<unquote(type), rem_schema :: binary>>, buffer, opts) do
+        if byte_size(buffer) < unquote(size) do
+          decoded(rem_schema, <<>>, opts, unquote(default_on_fail))
+        else
+          <<term :: unquote(binary_desc), rem_buffer :: binary>> = buffer
+          decoded(rem_schema, rem_buffer, opts, term)
+        end
+
+      end
     end
   end
 end
