@@ -39,6 +39,18 @@ defmodule Packer.Encode do
     acc <> <<@c_atom :: 8-unsigned-integer, length :: 8-unsigned-integer>>
   end
 
+  defp encode_schema({@c_binary_1, length}, acc) when length <= 255 do
+    acc <> <<@c_binary_1 :: 8-unsigned-integer, length :: 8-unsigned-integer>>
+  end
+
+  defp encode_schema({@c_binary_1, length}, acc) when length <= 65_535 do
+      acc <> <<@c_binary_2 :: 8-unsigned-integer, length :: 16-unsigned-integer>>
+  end
+
+  defp encode_schema({@c_binary_1, length}, acc) do
+      acc <> <<@c_binary_4 :: 8-unsigned-integer, length :: 32-unsigned-integer>>
+  end
+
   defp encode_schema({@c_tuple, arity, elements}, acc) do
     subschema = encode_schema(elements)
     if arity < @c_max_short_tuple do
@@ -111,8 +123,8 @@ defmodule Packer.Encode do
   # note: 1 is added to the reps since at the time of being called, the last
   # rep will have not been tallied, or looked at another way the first item
   # is "zeroth rep'd", and so we always are one short here
-  defp repeater_tuple(reps) when reps < 256, do: {:rep, @c_repeat_1, reps + 1}
-  defp repeater_tuple(reps) when reps < 65536, do: {:rep, @c_repeat_2, reps + 1}
+  defp repeater_tuple(reps) when reps <= 255, do: {:rep, @c_repeat_1, reps + 1}
+  defp repeater_tuple(reps) when reps <= 65_535, do: {:rep, @c_repeat_2, reps + 1}
   defp repeater_tuple(reps), do: {:rep, @c_repeat_4, reps + 1}
 
   defp encode_one(opts, schema, buffer, t) when is_tuple(t) do
@@ -147,7 +159,7 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_bitstring(t) do
-    {[{@c_binary, byte_size(t)} | schema], buffer <> t}
+    {[{@c_binary_1, byte_size(t)} | schema], buffer <> t}
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_atom(t) do
