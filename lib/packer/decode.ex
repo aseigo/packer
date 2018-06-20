@@ -27,7 +27,7 @@ defmodule Packer.Decode do
     check_header(:version, version)
   end
 
-  defp check_header(type, header), do: false
+  defp check_header(_type, _header), do: false
 
   defp decoded(<<>>, _buffer, _opts, term), do: term
   defp decoded(schema, buffer, opts, term), do: decode_one(schema, buffer, opts)
