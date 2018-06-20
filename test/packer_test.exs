@@ -150,13 +150,13 @@ defmodule PackerTest do
   end
 
   test "unpacking with full header requires `header: :full`" do
-    assert Packer.decode([Packer.encoded_term_header(:full), <<>>, <<>>], header: :full) != {:error, :bad_header}
-    assert Packer.decode([Packer.encoded_term_header(:full), <<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>], header: :full) != {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
   end
 
-  test "unpacking with no define header type works with a version header" do
-    assert Packer.decode([Packer.encoded_term_header(:full), <<>>, <<>>]) === {:error, :bad_header}
-    assert Packer.decode([Packer.encoded_term_header(), <<>>, <<>>]) !== {:error, :bad_header}
+  test "unpacking with no defined header type works with a version header" do
+    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
+    assert Packer.decode([Packer.encoded_term_header(), <<2>>, <<1>>]) !== {:error, :bad_header}
   end
 
   test "unpacks numbers" do
