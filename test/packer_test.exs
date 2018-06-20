@@ -168,6 +168,6 @@ defmodule PackerTest do
     M.decoding("b")
     M.decoding(3.14)
     #M.decoding("binary")
-    #M.decoding(:atom)
+    M.decoding(:atom)
   end
 end

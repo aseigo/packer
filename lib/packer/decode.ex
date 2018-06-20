@@ -41,4 +41,22 @@ defmodule Packer.Decode do
   decode_primitive(@c_big_int, 8, 64-signed-integer, 0)
   decode_primitive(@c_byte, 1, 8-bits, "")
   decode_primitive(@c_float, 8, 64-float, 0.0)
+
+
+  defp decode_one(<<@c_atom, rem_schema :: binary>>, buffer, opts) do
+    decode_atom(rem_schema, buffer, opts)
+  end
+
+  defp decode_atom(<<size :: 8-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
+    if byte_size(buffer) < size do
+      decoded(rem_schema, <<>>, opts, nil)
+    else
+      {term, rem_buffer} = String.split_at(buffer, size)
+      decoded(rem_schema, rem_buffer, opts, String.to_atom(term))
+    end
+  end
+
+  defp decode_atom(schema, buffer, opts) do
+    decoded(<<>>, buffer, opts, nil)
+  end
 end
