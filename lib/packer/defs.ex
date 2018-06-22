@@ -49,12 +49,12 @@ defmodule Packer.Defs do
 
   defmacro debuffer_primitive(type, length_bytes, binary_desc, default_on_fail) do
     quote do
-      defp debuffer_one(unquote(type), schema, buffer, opts) do
+      defp debuffer_one(unquote(type), schema, buffer) do
         if byte_size(buffer) < unquote(length_bytes) do
-          decoded(schema, <<>>, opts, unquote(default_on_fail))
+          decoded(schema, <<>>, unquote(default_on_fail))
         else
           <<term :: unquote(binary_desc), rem_buffer :: binary>> = buffer
-          decoded(schema, rem_buffer, opts, term)
+          decoded(schema, rem_buffer, term)
         end
       end
     end
@@ -95,21 +95,21 @@ defmodule Packer.Defs do
       |> String.to_atom
 
     quote do
-      defp debuffer_one(unquote(type), schema, buffer, opts) do
-        unquote(fn_name)(schema, buffer, opts)
+      defp debuffer_one(unquote(type), schema, buffer) do
+        unquote(fn_name)(schema, buffer)
       end
 
-      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
+      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-integer, rem_schema :: binary>>, buffer) do
         if byte_size(buffer) < size do
-          decoded(rem_schema, <<>>, opts, unquote(on_fail))
+          decoded(rem_schema, <<>>, unquote(on_fail))
         else
           {term, rem_buffer} = String.split_at(buffer, size)
-          decoded(rem_schema, rem_buffer, opts, unquote(final_term))
+          decoded(rem_schema, rem_buffer, unquote(final_term))
         end
       end
 
-      defp unquote(fn_name)(_schema, buffer, opts) do
-        decoded(<<>>, buffer, opts, <<>>)
+      defp unquote(fn_name)(_schema, buffer) do
+        decoded(<<>>, buffer, <<>>)
       end
     end
   end
