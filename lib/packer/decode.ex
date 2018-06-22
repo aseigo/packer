@@ -1,5 +1,3 @@
-#ifndef DECODE_EX
-#define DECODE_EX
 defmodule Packer.Decode do
   use Packer.Defs
 
@@ -88,10 +86,30 @@ defmodule Packer.Decode do
   end
 
   defp decode_next_list_item(<<@c_repeat_1, rem_schema :: binary>>, buffer, opts, acc) do
-    if byte_size(buffer) < 1 do
+    if byte_size(buffer) < 2 do
       decoded(rem_schema, buffer, opts, Enum.reverse(acc))
     else
       <<count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      is_container = Packer.Utils.is_container_type?(type)
+      decode_n_list_items(type, rem_schema, buffer, opts, is_container, acc, count)
+    end
+  end
+
+  defp decode_next_list_item(<<@c_repeat_2, rem_schema :: binary>>, buffer, opts, acc) do
+    if byte_size(buffer) < 3 do
+      decoded(rem_schema, buffer, opts, Enum.reverse(acc))
+    else
+      <<count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      is_container = Packer.Utils.is_container_type?(type)
+      decode_n_list_items(type, rem_schema, buffer, opts, is_container, acc, count)
+    end
+  end
+
+  defp decode_next_list_item(<<@c_repeat_4, rem_schema :: binary>>, buffer, opts, acc) do
+    if byte_size(buffer) < 5 do
+      decoded(rem_schema, buffer, opts, Enum.reverse(acc))
+    else
+      <<count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_list_items(type, rem_schema, buffer, opts, is_container, acc, count)
     end
@@ -120,12 +138,32 @@ defmodule Packer.Decode do
   defp decode_next_tuple_item(schema, buffer, opts, 0, acc), do: decoded(schema, buffer, opts, acc)
 
   defp decode_next_tuple_item(<<@c_repeat_1, rem_schema :: binary>>, buffer, opts, count, acc) do
-    if byte_size(buffer) < 1 do
-      #TODO is it really right to just ignore it at this point?
+    if byte_size(buffer) < 2 do
       decoded(rem_schema, buffer, opts, acc)
     else
       <<rep_count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
-      decode_n_tuple_items(type, rem_schema, buffer, opts, count, acc, rep_count)
+      is_container = Packer.Utils.is_container_type?(type)
+      decode_n_tuple_items(type, rem_schema, buffer, opts, is_container, count, acc, rep_count)
+    end
+  end
+
+  defp decode_next_tuple_item(<<@c_repeat_2, rem_schema :: binary>>, buffer, opts, count, acc) do
+    if byte_size(buffer) < 3 do
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<rep_count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      is_container = Packer.Utils.is_container_type?(type)
+      decode_n_tuple_items(type, rem_schema, buffer, opts, is_container, count, acc, rep_count)
+    end
+  end
+
+  defp decode_next_tuple_item(<<@c_repeat_4, rem_schema :: binary>>, buffer, opts, count, acc) do
+    if byte_size(buffer) < 5 do
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<rep_count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      is_container = Packer.Utils.is_container_type?(type)
+      decode_n_tuple_items(type, rem_schema, buffer, opts, is_container, count, acc, rep_count)
     end
   end
 
@@ -135,14 +173,18 @@ defmodule Packer.Decode do
     decode_next_tuple_item(rem_schema, rem_buffer, opts, count - 1, acc)
   end
 
-  defp decode_n_tuple_items(_type, schema, buffer, opts, count, acc, 0) do
+  defp decode_n_tuple_items(_type, schema, buffer, opts, _is_container, count, acc, 0) do
     decode_next_tuple_item(schema, buffer, opts, count, acc)
   end
 
-  defp decode_n_tuple_items(type, schema, buffer, opts, count, acc, rep_count) do
+  defp decode_n_tuple_items(type, schema, buffer, opts, is_container, count, acc, rep_count) do
     {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer, opts)
     acc = Tuple.append(acc, term)
-    decode_n_tuple_items(type, rem_schema, rem_buffer, opts, count - 1, acc, rep_count - 1)
+
+    if is_container do
+      decode_n_tuple_items(type, schema, rem_buffer, opts, is_container, count - 1, acc, rep_count - 1)
+    else
+      decode_n_tuple_items(type, rem_schema, rem_buffer, opts, is_container, count - 1, acc, rep_count - 1)
+    end
   end
 end
-#endif // DECODE_EX
