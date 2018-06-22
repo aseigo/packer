@@ -260,4 +260,17 @@ defmodule PackerTest do
   test "unpacks structs" do
     M.decoding(%Foo{})
   end
+
+  test "unpacking without compresion" do
+    M.decoding([1, 1, 1, 1], compress: false)
+
+    compressable = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    assert compressable === (Packer.encode(compressable, compress: false) |> Packer.decode())
+  end
+
+  test "unpacking with compression" do
+    compressable = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    assert compressable === (Packer.encode(compressable) |> Packer.decode())
+    refute compressable == (Packer.encode(compressable) |> Packer.decode(compress: false))
+  end
 end
