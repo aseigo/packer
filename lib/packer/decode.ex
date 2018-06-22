@@ -124,8 +124,9 @@ defmodule Packer.Decode do
     decode_next_list_item(rem_schema, rem_buffer, opts, [term | acc])
   end
 
-  defp decode_n_list_items(_type, schema, buffer, opts, _is_container, acc, 0) do
-    decode_next_list_item(schema, buffer, opts, acc)
+  defp decode_n_list_items(type, schema, buffer, opts, _is_container, acc, 1) do
+    {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer, opts)
+    decode_next_list_item(rem_schema, rem_buffer, opts, [term | acc])
   end
 
   defp decode_n_list_items(type, schema, buffer, opts, is_container, acc, count) do

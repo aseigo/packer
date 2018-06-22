@@ -218,6 +218,9 @@ defmodule PackerTest do
   test "unpacks lists with repeating containers" do
     M.decoding([[1, 2], [3, 4]])
     M.decoding([{1, 2}, {3, 4}])
+    M.decoding([1, {1, 2}, {3, 4}])
+    M.decoding([1, {1, 2}, {3, 4}, 2])
+    M.decoding([{1, 2}, {3, 4}, 2])
   end
 
   test "unpacks tuples" do
