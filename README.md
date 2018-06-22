@@ -1,4 +1,4 @@
-# Pack
+# Packer
 
 A space-efficient term serializer, with specific attention paid to handling
 large, nested / repetitive terms. The latter is somewhere that the usual
@@ -17,7 +17,7 @@ of integers") and using zstd for compression of the data buffer.
 
 ## Installation
 
-Packer can be installed by by adding `pack` to your list of dependencies in `mix.exs`:
+Packer can be installed by by adding `packer` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
@@ -27,5 +27,5 @@ def deps do
 end
 ```
 
-Docs can be found at [https://hexdocs.pm/pack](https://hexdocs.pm/packer).
+Docs can be found at [https://hexdocs.pm/packer](https://hexdocs.pm/packer).
 
