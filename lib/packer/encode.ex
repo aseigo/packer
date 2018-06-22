@@ -1,6 +1,5 @@
 defmodule Packer.Encode do
   use Packer.Defs
-  use Bitwise
 
   def from_term(term, opts) do
     {schema, buffer} = encode_one(opts, [], <<>>, term)
@@ -56,7 +55,7 @@ defmodule Packer.Encode do
     if arity < @c_max_short_tuple do
       acc <> <<@c_tuple + arity :: 8-unsigned-integer>> <> subschema
     else
-      acc <> <<@c_tuple :: 8-unsigned-integer, arity :: 16-unsigned-integer>> <> subschema
+      acc <> <<@c_var_size_tuple :: 8-unsigned-integer, arity :: 16-unsigned-integer>> <> subschema
     end
   end
 
