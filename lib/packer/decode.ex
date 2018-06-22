@@ -205,8 +205,7 @@ defmodule Packer.Decode do
       decoded(rem_schema, buffer, opts, acc)
     else
       <<count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
-      is_container = Packer.Utils.is_container_type?(type)
-      decode_n_map_pairs(type, rem_schema, buffer, opts, is_container, acc, count)
+      decode_n_map_pairs(type, rem_schema, buffer, opts, acc, count)
     end
   end
 
@@ -215,8 +214,7 @@ defmodule Packer.Decode do
       decoded(rem_schema, buffer, opts, acc)
     else
       <<count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
-      is_container = Packer.Utils.is_container_type?(type)
-      decode_n_map_pairs(type, rem_schema, buffer, opts, is_container, acc, count)
+      decode_n_map_pairs(type, rem_schema, buffer, opts, acc, count)
     end
   end
 
@@ -225,8 +223,7 @@ defmodule Packer.Decode do
       decoded(rem_schema, buffer, opts, acc)
     else
       <<count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
-      is_container = Packer.Utils.is_container_type?(type)
-      decode_n_map_pairs(type, rem_schema, buffer, opts, is_container, acc, count)
+      decode_n_map_pairs(type, rem_schema, buffer, opts, acc, count)
     end
   end
 
@@ -236,19 +233,17 @@ defmodule Packer.Decode do
     decode_next_map_pair(rem_schema, rem_buffer, opts, Map.put(acc, key, value))
   end
 
-  defp decode_n_map_pairs(_type, schema, buffer, opts, _is_container, acc, 0) do
-    decode_next_map_pair(schema, buffer, opts, acc)
-  end
-
-  defp decode_n_map_pairs(type, schema, buffer, opts, is_container, acc, count) do
+  defp decode_n_map_pairs(type, schema, buffer, opts, acc, 1) do
     {rem_schema, rem_buffer, key} = debuffer_one(type, schema, buffer, opts)
     {rem_schema, rem_buffer, value} = decode_one(rem_schema, rem_buffer, opts)
+    decode_next_map_pair(rem_schema, rem_buffer, opts, Map.put(acc, key, value))
+  end
 
-    # when we are decoding a repeating contanier, we need to re-use the schema
-    if is_container do
-      decode_n_map_pairs(type, schema, rem_buffer, opts, is_container, Map.put(acc, key, value), count - 1)
-    else
-      decode_n_map_pairs(type, rem_schema, rem_buffer, opts, is_container, Map.put(acc, key, value), count - 1)
-    end
+  defp decode_n_map_pairs(type, schema, buffer, opts, acc, count) do
+    {rem_schema, rem_buffer, key} = debuffer_one(type, schema, buffer, opts)
+    {_rem_schema, rem_buffer, value} = decode_one(rem_schema, rem_buffer, opts)
+
+    # the repetition in maps is always equivalent to a tuple, so we need to re-use the schema
+    decode_n_map_pairs(type, schema, rem_buffer, opts, Map.put(acc, key, value), count - 1)
   end
 end

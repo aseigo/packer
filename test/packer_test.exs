@@ -247,11 +247,11 @@ defmodule PackerTest do
   end
 
   test "unpacks maps with repeating containers" do
-    #M.decoding(%{a: 1, b: 2})
-    #M.decoding(%{{"b", 123} => 1, {"c", 124} => 2})
+    M.decoding(%{a: 1, b: 2})
+    M.decoding(%{{"b", 123} => 1, {"c", 124} => 2})
   end
 
   test "unpacks structs" do
-    #M.decoding(%Foo{})
+    M.decoding(%Foo{})
   end
 end
