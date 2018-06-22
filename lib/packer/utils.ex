@@ -2,6 +2,10 @@ defmodule Packer.Utils do
   use Packer.Defs
   use Bitwise
 
+  def is_container_type?(@c_list), do: true
+  def is_container_type?(@c_map), do: true
+  def is_container_type?(type), do: is_tuple_type?(type)
+
   def is_tuple_type?(type) do
     (type &&& @c_tuple) == @c_tuple
   end
