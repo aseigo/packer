@@ -239,4 +239,19 @@ defmodule PackerTest do
     M.decoding({{1, 2}, {2, 3}})
     M.decoding({[1, 2], [2, 3]})
   end
+
+  test "unpacks maps" do
+    M.decoding(%{})
+    M.decoding(%{:a => 1, 2 => 3})
+    M.decoding(%{{"b", 123} => 1, {:c, 124} => [1, 2, 3], [1, 2] => :alpha})
+  end
+
+  test "unpacks maps with repeating containers" do
+    M.decoding(%{a: 1, b: 2})
+    M.decoding(%{{"b", 123} => 1, {"c", 124} => 2})
+  end
+
+  test "unpacks structs" do
+    M.decoding(%Foo{})
+  end
 end

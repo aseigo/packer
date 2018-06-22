@@ -38,6 +38,10 @@ defmodule Packer.Decode do
     decode_next_list_item(rem_schema, buffer, opts, [])
   end
 
+  defp decode_one(<<@c_map, rem_schema :: binary>>, buffer, opts) do
+    decode_next_map_pair(rem_schema, buffer, opts, %{})
+  end
+
   defp decode_one(<<type :: 8-unsigned-integer, rem_schema :: binary>>, buffer, opts) do
     if Packer.Utils.is_tuple_type?(type) do
       {arity, rem_schema} = Packer.Utils.tuple_arity(type, rem_schema)
@@ -186,5 +190,60 @@ defmodule Packer.Decode do
     else
       decode_n_tuple_items(type, rem_schema, rem_buffer, opts, is_container, count - 1, acc, rep_count - 1)
     end
+  end
+
+  defp decode_next_map_pair(<<>>, buffer, opts, acc) do
+    decoded(<<>>, buffer, opts, acc)
+  end
+
+  defp decode_next_map_pair(<<0, rem_schema :: binary>>, buffer, opts, acc) do
+    decoded(rem_schema, buffer, opts, acc)
+  end
+
+  defp decode_next_map_pair(<<@c_repeat_1, rem_schema :: binary>>, buffer, opts, acc) do
+    if byte_size(buffer) < 2 do
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      decode_n_map_pairs(type, rem_schema, buffer, opts, acc, count)
+    end
+  end
+
+  defp decode_next_map_pair(<<@c_repeat_2, rem_schema :: binary>>, buffer, opts, acc) do
+    if byte_size(buffer) < 3 do
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      decode_n_map_pairs(type, rem_schema, buffer, opts, acc, count)
+    end
+  end
+
+  defp decode_next_map_pair(<<@c_repeat_4, rem_schema :: binary>>, buffer, opts, acc) do
+    if byte_size(buffer) < 5 do
+      decoded(rem_schema, buffer, opts, acc)
+    else
+      <<count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      decode_n_map_pairs(type, rem_schema, buffer, opts, acc, count)
+    end
+  end
+
+  defp decode_next_map_pair(schema, buffer, opts, acc) do
+    {rem_schema, rem_buffer, key} = decode_one(schema, buffer, opts)
+    {rem_schema, rem_buffer, value} = decode_one(rem_schema, rem_buffer, opts)
+    decode_next_map_pair(rem_schema, rem_buffer, opts, Map.put(acc, key, value))
+  end
+
+  defp decode_n_map_pairs(type, schema, buffer, opts, acc, 1) do
+    {rem_schema, rem_buffer, key} = debuffer_one(type, schema, buffer, opts)
+    {rem_schema, rem_buffer, value} = decode_one(rem_schema, rem_buffer, opts)
+    decode_next_map_pair(rem_schema, rem_buffer, opts, Map.put(acc, key, value))
+  end
+
+  defp decode_n_map_pairs(type, schema, buffer, opts, acc, count) do
+    {rem_schema, rem_buffer, key} = debuffer_one(type, schema, buffer, opts)
+    {_rem_schema, rem_buffer, value} = decode_one(rem_schema, rem_buffer, opts)
+
+    # the repetition in maps is always equivalent to a tuple, so we need to re-use the schema
+    decode_n_map_pairs(type, schema, rem_buffer, opts, Map.put(acc, key, value), count - 1)
   end
 end
