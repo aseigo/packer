@@ -1,4 +1,6 @@
 defmodule Packer.Defs do
+  @moduledoc false
+
   defmacro __using__(_) do
     quote do
       import Packer.Defs

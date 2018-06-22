@@ -236,6 +236,7 @@ defmodule PackerTest do
     M.decoding({:nothing, :but, :atoms})
     M.decoding({"just", "binary", "strings"})
     M.decoding({[1, 2], [:atom, "binary"]})
+    M.decoding({%{a: 2}, 1, 2})
   end
 
   test "unpacks tuples with repeating containers" do

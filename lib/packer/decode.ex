@@ -1,4 +1,6 @@
 defmodule Packer.Decode do
+  @moduledoc false
+
   use Packer.Defs
 
   def from_iodata([header, schema, buffer], opts) do

@@ -1,4 +1,6 @@
 defmodule Packer.Encode do
+  @moduledoc false
+
   use Packer.Defs
 
   def from_term(term, opts) do

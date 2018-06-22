@@ -7,14 +7,12 @@ the transmission of messages containing large lists / maps of lists / maps / tup
 between nodes.
 
 Pack significantly reduces the space required to serialize a term by utilizing a
-schema + buffer approach with support for shape repetition (e.g. "N * two-tuple of
-integers").
+schema + data buffer approach with support for shape repetition (e.g. "N * two-tuple
+of integers") and using zstd for compression of the data buffer.
 
 ```
   NOTE: this library is still in early development, and not ready for production use.
-  Documentation of the serialization format, apidocs, etc. will come once things calm
-  down a bit. The encoding is still in flux, and the api is still growing and what is
-  there is not finalized, so one step at a time. :)
+  Documentation of the serialization format, apidocs, etc. will come after 0.1.0.
 ```
 
 ## Installation

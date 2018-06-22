@@ -1,4 +1,6 @@
 defmodule Packer.Utils do
+  @moduledoc false
+
   use Packer.Defs
   use Bitwise
 
