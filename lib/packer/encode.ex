@@ -1,6 +1,7 @@
 defmodule Packer.Encode do
+  @moduledoc false
+
   use Packer.Defs
-  use Bitwise
 
   def from_term(term, opts) do
     {schema, buffer} = encode_one(opts, [], <<>>, term)
@@ -11,8 +12,7 @@ defmodule Packer.Encode do
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
     if compress? do
-      compressed_buffer = :zstd.compress(buffer, 5)
-      #IO.puts("#{byte_size(compressed_buffer)} < #{byte_size(buffer)}")
+      compressed_buffer = Packer.Utils.compress(buffer)
       if byte_size(compressed_buffer) < byte_size(buffer) do
         encoded_iodata(encoded_schema, compressed_buffer, header_type)
       else
@@ -40,12 +40,24 @@ defmodule Packer.Encode do
     acc <> <<@c_atom :: 8-unsigned-integer, length :: 8-unsigned-integer>>
   end
 
+  defp encode_schema({@c_binary_1, length}, acc) when length <= 255 do
+    acc <> <<@c_binary_1 :: 8-unsigned-integer, length :: 8-unsigned-integer>>
+  end
+
+  defp encode_schema({@c_binary_1, length}, acc) when length <= 65_535 do
+      acc <> <<@c_binary_2 :: 8-unsigned-integer, length :: 16-unsigned-integer>>
+  end
+
+  defp encode_schema({@c_binary_1, length}, acc) do
+      acc <> <<@c_binary_4 :: 8-unsigned-integer, length :: 32-unsigned-integer>>
+  end
+
   defp encode_schema({@c_tuple, arity, elements}, acc) do
     subschema = encode_schema(elements)
     if arity < @c_max_short_tuple do
       acc <> <<@c_tuple + arity :: 8-unsigned-integer>> <> subschema
     else
-      acc <> <<@c_tuple :: 8-unsigned-integer, arity :: 16-unsigned-integer>> <> subschema
+      acc <> <<@c_var_size_tuple :: 8-unsigned-integer, arity :: 16-unsigned-integer>> <> subschema
     end
   end
 
@@ -61,7 +73,7 @@ defmodule Packer.Encode do
           encode_schema(value, e)
       end)
 
-    acc <> <<@c_map:: 8-unsigned-integer>> <> encoded_elements <> <<@c_collect_end>>
+    acc <> <<@c_map:: 8-unsigned-integer>> <> encoded_elements <> <<@c_collection_end>>
   end
 
   defp encode_schema({:rep, @c_repeat_1, reps}, acc) do
@@ -77,7 +89,7 @@ defmodule Packer.Encode do
   end
 
   defp encode_schema({code, elements}, acc) when is_list(elements) do
-    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<@c_collect_end>>
+    acc <> <<code :: 8-unsigned-integer>> <> encode_schema(elements) <> <<@c_collection_end>>
   end
 
   defp encode_schema({code, length}, acc) do
@@ -112,8 +124,8 @@ defmodule Packer.Encode do
   # note: 1 is added to the reps since at the time of being called, the last
   # rep will have not been tallied, or looked at another way the first item
   # is "zeroth rep'd", and so we always are one short here
-  defp repeater_tuple(reps) when reps < 256, do: {:rep, @c_repeat_1, reps + 1}
-  defp repeater_tuple(reps) when reps < 65536, do: {:rep, @c_repeat_2, reps + 1}
+  defp repeater_tuple(reps) when reps <= 255, do: {:rep, @c_repeat_1, reps + 1}
+  defp repeater_tuple(reps) when reps <= 65_535, do: {:rep, @c_repeat_2, reps + 1}
   defp repeater_tuple(reps), do: {:rep, @c_repeat_4, reps + 1}
 
   defp encode_one(opts, schema, buffer, t) when is_tuple(t) do
@@ -148,7 +160,7 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_bitstring(t) do
-    {[{@c_binary, byte_size(t)} | schema], buffer <> t}
+    {[{@c_binary_1, byte_size(t)} | schema], buffer <> t}
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_atom(t) do
@@ -214,34 +226,34 @@ defmodule Packer.Encode do
 
   defp add_integer(opts, schema, buffer, t) when t >= 0 and t <=255 do
     if Keyword.get(opts, :small_int, true) do
-      {[@c_small_int | schema], buffer <> <<t :: 8-unsigned-integer>>}
+      {[@c_small_uint | schema], buffer <> <<t :: 8-unsigned-integer>>}
     else
-      {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
+      {[@c_short_uint | schema], buffer <> <<t :: 16-unsigned-integer>>}
     end
   end
 
   defp add_integer(opts, schema, buffer, t) when t >= -127 and t < 0 do
     if Keyword.get(opts, :small_int, true) do
-      {[@c_small_uint | schema], buffer <> <<t :: 8-signed-integer>>}
+      {[@c_small_int | schema], buffer <> <<t :: 8-signed-integer>>}
     else
-      {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
+      {[@c_short_int | schema], buffer <> <<t :: 16-signed-integer>>}
     end
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 65_535 do
-    {[@c_short_int | schema], buffer <> <<t :: 16-unsigned-integer>>}
+    {[@c_short_uint | schema], buffer <> <<t :: 16-unsigned-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= -32_767 and t < 0 do
-    {[@c_short_uint | schema], buffer <> <<t :: 16-signed-integer>>}
+    {[@c_short_int | schema], buffer <> <<t :: 16-signed-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
-    {[@c_int | schema], buffer <> <<t :: 32-unsigned-integer>>}
+    {[@c_uint | schema], buffer <> <<t :: 32-unsigned-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
-    {[@c_uint | schema], buffer <> <<t :: 32-signed-integer>>}
+    {[@c_int | schema], buffer <> <<t :: 32-signed-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) do

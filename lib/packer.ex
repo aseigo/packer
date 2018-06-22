@@ -37,7 +37,7 @@ defmodule Packer do
                              {:compress, boolean},
                              {:header, :version | :full | :none}
                             ]
-  defdelegate decode(data, opts), to: Packer.Decode, as: :from_iodata
+  defdelegate decode(data, opts \\ []), to: Packer.Decode, as: :from_iodata
 
   @doc """
   Returns the magic string header prepended to encodings. The type parameter can be :none,
