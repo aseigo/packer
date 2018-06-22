@@ -7,7 +7,9 @@ defmodule Pack.MixProject do
       version: "0.1.0",
       elixir: "~> 1.6",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.html": :test]
     ]
   end
 
@@ -21,7 +23,8 @@ defmodule Pack.MixProject do
     [
       {:zstd, "~> 0.2.0"},
       {:remix, "~> 0.0.2", only: [:dev]},
-      {:ex_doc, "~> 0.18.3", only: [:dev]}
+      {:ex_doc, "~> 0.18.3", only: [:dev]},
+      {:excoveralls, "~> 0.9.1", only: :test},
     ]
   end
 end
