@@ -177,8 +177,10 @@ defmodule Packer.Decode do
     decode_next_tuple_item(rem_schema, rem_buffer, opts, count - 1, acc)
   end
 
-  defp decode_n_tuple_items(_type, schema, buffer, opts, _is_container, count, acc, 0) do
-    decode_next_tuple_item(schema, buffer, opts, count, acc)
+  defp decode_n_tuple_items(type, schema, buffer, opts, _is_container, count, acc, 1) do
+    {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer, opts)
+    acc = Tuple.append(acc, term)
+    decode_next_tuple_item(rem_schema, rem_buffer, opts, count - 1, acc)
   end
 
   defp decode_n_tuple_items(type, schema, buffer, opts, is_container, count, acc, rep_count) do
