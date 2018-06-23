@@ -11,24 +11,37 @@ defmodule Packer.Encode do
 
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
+    format = Keyword.get(opts, :format, :iolist)
     if compress? do
       compressed_buffer = Packer.Utils.compress(buffer)
       if byte_size(compressed_buffer) < byte_size(buffer) do
-        encoded_iodata(encoded_schema, compressed_buffer, header_type)
+        encoded_iodata(encoded_schema, compressed_buffer, header_type, format)
       else
-        encoded_iodata(encoded_schema, buffer, header_type)
+        encoded_iodata(encoded_schema, buffer, header_type, format)
       end
     else
-      encoded_iodata(encoded_schema, buffer, header_type)
+      encoded_iodata(encoded_schema, buffer, header_type, format)
     end
   end
 
   def encoded_term_header(:full), do: @c_full_header
   def encoded_term_header(:version), do: @c_version_header
 
-  defp encoded_iodata(schema, buffer, :none), do: [schema, buffer]
-  defp encoded_iodata(schema, buffer, :full), do: [@c_full_header, schema, buffer]
-  defp encoded_iodata(schema, buffer, :version), do: [@c_version_header, schema, buffer]
+  defp encoded_iodata(schema, buffer, :none, :iolist), do: [schema, buffer]
+  defp encoded_iodata(schema, buffer, :none, :binary) do
+    schema_length = byte_size(schema)
+    <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
+  end
+  defp encoded_iodata(schema, buffer, :full, :iolist), do: [@c_full_header, schema, buffer]
+  defp encoded_iodata(schema, buffer, :full, :binary) do
+    schema_length = byte_size(schema)
+    @c_full_header <> <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
+  end
+  defp encoded_iodata(schema, buffer, :version, :iolist), do: [@c_version_header, schema, buffer]
+  defp encoded_iodata(schema, buffer, :version, :binary) do
+    schema_length = byte_size(schema)
+    @c_version_header <> <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
+  end
 
   defp encode_schema(schema) do
     Enum.reduce(schema, <<>>, &encode_schema/2)

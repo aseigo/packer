@@ -141,26 +141,38 @@ defmodule PackerTest do
 
   test "unpacking with no header fails without `header: :none`" do
     assert Packer.decode([<<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode(<<>>) == {:error, :bad_header}
   end
 
   test "unpacking with `header: :none` fails if there is a header" do
-    assert Packer.decode([Packer.encoded_term_header(), <<>>, <<>>], header: :none) === {:error, :bad_header}
+    header = Packer.encoded_term_header()
+    assert Packer.decode([header, <<>>, <<>>], header: :none) === {:error, :bad_header}
+    assert Packer.decode(header <> <<1 :: 32-unsigned-little-integer, 2, 1>>, header: :none) === {:error, :bad_header}
   end
 
   test "unpacking with wrong version header fails" do
-    assert Packer.decode([<<>>, <<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode([<<0x01>>, <<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode(<<0x01, 1 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
   end
 
   test "unpacking with full header requires `header: :full`" do
-    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>], header: :full) != {:error, :bad_header}
-    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
+    header = Packer.encoded_term_header(:full)
+    assert Packer.decode([header, <<2>>, <<1>>], header: :full) != {:error, :bad_header}
+    assert Packer.decode(header <> <<1 :: 32-unsigned-little-integer, 2, 1>>, header: :full) != {:error, :bad_header}
+    assert Packer.decode([header, <<2>>, <<1>>]) === {:error, :bad_header}
+    assert Packer.decode(header <> <<1 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
   end
 
   test "unpacking with no defined header type works with a version header" do
     assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
+    assert Packer.decode(Packer.encoded_term_header(:full) <> <<1 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
     assert Packer.decode([Packer.encoded_term_header(), <<2>>, <<1>>]) !== {:error, :bad_header}
+    assert Packer.decode(Packer.encoded_term_header() <> <<1 :: 32-unsigned-little-integer, 2, 1>>) !== {:error, :bad_header}
   end
 
+  test "unpacking a unified binary with a bad schema size failes" do
+    assert Packer.decode(Packer.encoded_term_header() <> <<20 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
+  end
   test "unpacks numbers" do
     M.decoding(0)
     M.decoding(1)
@@ -275,5 +287,9 @@ defmodule PackerTest do
     compressable = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     assert compressable === (Packer.encode(compressable) |> Packer.decode())
     refute compressable == (Packer.encode(compressable) |> Packer.decode(compress: false))
+  end
+
+  test "unpacks unified buffers" do
+    M.decoding([1, 1, 1, 1, 1], format: :binary)
   end
 end
