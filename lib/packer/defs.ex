@@ -24,6 +24,7 @@ defmodule Packer.Defs do
       # collections, variable size, marked by an end byte value
       @c_list        0x21
       @c_map         0x22
+      @c_struct      0x23
       @c_collection_end 0x00
 
       # tuples are size 0..N where N up to 62 is encoded in the type byte
@@ -43,8 +44,8 @@ defmodule Packer.Defs do
       @c_max_short_tuple 0b01111111 - 0b01000000
       @c_var_size_tuple 0b01111111
       @c_tuple_arity_mask 0b00111111
-      @c_version_header <<0x01>> # '01'
-      @c_full_header <<0x45, 0x50, 0x4B, 0x52, 0x01>> # 'EPKR1'
+      @c_version_header <<0x02>> # '01'
+      @c_full_header <<0x45, 0x50, 0x4B, 0x52, 0x02>> # 'EPKR1'
       @c_full_header_prefix <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
     end
   end
@@ -101,7 +102,7 @@ defmodule Packer.Defs do
         unquote(fn_name)(schema, buffer)
       end
 
-      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-integer, rem_schema :: binary>>, buffer) do
+      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-little-integer, rem_schema :: binary>>, buffer) do
         if byte_size(buffer) < size do
           decoded(rem_schema, <<>>, unquote(on_fail))
         else

@@ -12,7 +12,7 @@ defmodule PackerTest.Expect do
     end
   end
 
-  defmacro encoding(unpacked, schema, encoded_term, opts \\ []) do
+  defmacro encoding(unpacked, schema, encoded_term, opts \\ [], expect_shorter \\ true) do
     #line = __CALLER__.line
     quote do
       packed = Packer.encode(unquote(unpacked), unquote(opts))
@@ -20,7 +20,9 @@ defmodule PackerTest.Expect do
       #IO.inspect(compressed_buffer)
       assert gen_schema === unquote(schema)
       assert Packer.Utils.decompress(compressed_buffer) === unquote(encoded_term)
-      assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
+      if unquote(expect_shorter) do
+        assert :erlang.iolist_size(packed) <= :erlang.term_to_binary(unquote(unpacked)) |> byte_size()
+      end
       #Logger.debug("Line #{unquote(line)} => sizes: #{:erlang.iolist_size(packed)} <= #{:erlang.term_to_binary(unquote(unpacked)) |> byte_size()}")
     end
   end
@@ -41,12 +43,12 @@ defmodule PackerTest do
     M.encoding(-1, <<1>>, <<255>>)
     M.encoding(-126, <<1>>, <<130>>)
     M.encoding(257, <<4>>, <<1, 1>>)
-    M.encoding(-512, <<3>>, <<254, 0>>)
-    M.encoding(1_000_000, <<6>>, <<0, 15, 66, 64>>)
-    M.encoding(-1_000_000, <<5>>, <<255, 240, 189, 192>>)
-    M.encoding(1_000_000_000_000, <<7>>, <<0, 0, 0, 232, 212, 165, 16, 0>>)
-    M.encoding(-1_000_000_000_0000, <<7>>, <<255, 255, 246, 231, 177, 141, 96, 0>>)
-    M.encoding("b", <<9>>, "b")
+    M.encoding(-512, <<3>>, <<0, 254>>)
+    M.encoding(1_000_000, <<6>>, <<64, 66, 15, 0>>)
+    M.encoding(-1_000_000, <<5>>, <<192, 189, 240, 255>>)
+    M.encoding(1_000_000_000_000, <<7>>, <<0, 16, 165, 212, 232, 0, 0, 0>>, [], false)
+    M.encoding(-1_000_000_000_0000, <<7>>, <<0, 96, 141, 177, 231, 246, 255, 255>>)
+    M.encoding("b", <<10>>, "b")
     M.encoding(3.14, <<9>>, <<64, 9, 30, 184, 81, 235, 133, 31>>)
     M.encoding(:atom, <<14, 4>>, "atom")
   end
@@ -58,19 +60,19 @@ defmodule PackerTest do
 
   test "packs medium binaries" do
     binary = String.duplicate("f", 30_000)
-    M.encoding(binary, <<12, 30_000 :: unsigned-16-integer>>, binary)
+    M.encoding(binary, <<12, 30_000 :: unsigned-16-little-integer>>, binary)
   end
 
   test "packs long binaries" do
     binary = String.duplicate("f", 300_000)
-    M.encoding(binary, <<13, 300_000 :: unsigned-32-integer>>, binary)
+    M.encoding(binary, <<13, 300_000 :: unsigned-32-little-integer>>, binary)
   end
 
   test "packs flat lists" do
-    M.encoding([], <<33, 0>>, <<>>)
-    M.encoding([1], <<33, 1, 0>>, <<1>>)
-    M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 6, 1, 3, 0>>, <<1, 2, 3, 4, 5, 6, 27, 88>>)
-    M.encoding([1, :atom, "binary"], <<33, 1, 12, 4, 10, 0, 0, 0, 6, 0>>, <<1, "atom", "binary">>)
+    M.encoding([], <<33, 0>>, <<>>, [], false)
+    M.encoding([1], <<33, 2, 0>>, <<1>>)
+    M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 6, 2, 4, 0>>, <<1, 2, 3, 4, 5, 6, 88, 27>>)
+    M.encoding([1, :atom, "binary"], <<33, 2, 14, 4, 11, 6, 0>>, <<1, "atom", "binary">>)
   end
 
   test "packs nested lists" do
@@ -96,7 +98,7 @@ defmodule PackerTest do
               21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
               41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
               61, 62, 63},
-             <<127, 0, 63, 160, 63, 2>>,
+             <<127, 63, 0, 160, 63, 2>>,
              << 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
                39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
@@ -112,12 +114,12 @@ defmodule PackerTest do
   end
 
   test "packs structs" do
-    M.encoding(%Foo{}, <<34, 160, 2, 14, 1, 2, 14, 10, 14, 10, 0>>, <<97, 1, 98, 2, 95, 95, 115, 116, 114, 117, 99, 116, 95, 95, 69, 108, 105, 120, 105, 114, 46, 70, 111, 111>>)
+    M.encoding(%Foo{}, <<35, 10, 160, 2, 14, 1, 2, 0>>, <<69, 108, 105, 120, 105, 114, 46, 70, 111, 111, 97, 1, 98, 2>>)
   end
 
   test "small integers are options" do
-    M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 6, 2, 4, 0>>, <<1, 2, 3, 4, 5, 6, 27, 88>>)
-    M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 7, 4, 0>>, <<0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 27, 88>>, small_int: false)
+    M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 6, 2, 4, 0>>, <<1, 2, 3, 4, 5, 6, 88, 27>>)
+    M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 7, 4, 0>>, <<1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 88, 27>>, small_int: false)
   end
 
   test "compression is optional" do
@@ -139,26 +141,38 @@ defmodule PackerTest do
 
   test "unpacking with no header fails without `header: :none`" do
     assert Packer.decode([<<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode(<<>>) == {:error, :bad_header}
   end
 
   test "unpacking with `header: :none` fails if there is a header" do
-    assert Packer.decode([Packer.encoded_term_header(), <<>>, <<>>], header: :none) === {:error, :bad_header}
+    header = Packer.encoded_term_header()
+    assert Packer.decode([header, <<>>, <<>>], header: :none) === {:error, :bad_header}
+    assert Packer.decode(header <> <<1 :: 32-unsigned-little-integer, 2, 1>>, header: :none) === {:error, :bad_header}
   end
 
   test "unpacking with wrong version header fails" do
-    assert Packer.decode([<<>>, <<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode([<<0x01>>, <<>>, <<>>]) === {:error, :bad_header}
+    assert Packer.decode(<<0x01, 1 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
   end
 
   test "unpacking with full header requires `header: :full`" do
-    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>], header: :full) != {:error, :bad_header}
-    assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
+    header = Packer.encoded_term_header(:full)
+    assert Packer.decode([header, <<2>>, <<1>>], header: :full) != {:error, :bad_header}
+    assert Packer.decode(header <> <<1 :: 32-unsigned-little-integer, 2, 1>>, header: :full) != {:error, :bad_header}
+    assert Packer.decode([header, <<2>>, <<1>>]) === {:error, :bad_header}
+    assert Packer.decode(header <> <<1 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
   end
 
   test "unpacking with no defined header type works with a version header" do
     assert Packer.decode([Packer.encoded_term_header(:full), <<2>>, <<1>>]) === {:error, :bad_header}
+    assert Packer.decode(Packer.encoded_term_header(:full) <> <<1 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
     assert Packer.decode([Packer.encoded_term_header(), <<2>>, <<1>>]) !== {:error, :bad_header}
+    assert Packer.decode(Packer.encoded_term_header() <> <<1 :: 32-unsigned-little-integer, 2, 1>>) !== {:error, :bad_header}
   end
 
+  test "unpacking a unified binary with a bad schema size failes" do
+    assert Packer.decode(Packer.encoded_term_header() <> <<20 :: 32-unsigned-little-integer, 2, 1>>) === {:error, :bad_header}
+  end
   test "unpacks numbers" do
     M.decoding(0)
     M.decoding(1)
@@ -198,7 +212,7 @@ defmodule PackerTest do
   end
 
   test "unpacks a partial buffer when there are not enough bytes" do
-    assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13, 300_000 :: unsigned-32-integer>>, "too short"])
+    assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13, 300_000 :: unsigned-32-little-integer>>, "too short"])
   end
 
   test "unpacks flat lists" do
@@ -273,5 +287,9 @@ defmodule PackerTest do
     compressable = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     assert compressable === (Packer.encode(compressable) |> Packer.decode())
     refute compressable == (Packer.encode(compressable) |> Packer.decode(compress: false))
+  end
+
+  test "unpacks unified buffers" do
+    M.decoding([1, 1, 1, 1, 1], format: :binary)
   end
 end
