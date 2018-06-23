@@ -12,7 +12,6 @@ of integers") and using zstd for compression of the data buffer.
 
 ```
   NOTE: this library is still in early development, and not ready for production use.
-  Documentation of the serialization format, apidocs, etc. will come after 0.1.0.
 ```
 
 ## Installation
@@ -22,7 +21,7 @@ Packer can be installed by by adding `packer` to your list of dependencies in `m
 ```elixir
 def deps do
   [
-    {:packer, "~> 0.0.1"}
+    {:packer, "~> 0.0.2"}
   ]
 end
 ```
