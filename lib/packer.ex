@@ -15,6 +15,9 @@ defmodule Packer do
     ** :version -> the version number of the encoding is prepended
     ** :full -> a header suitable for durable storage (e.g. a file) is prepended
     ** :none -> no header; fewer bytes, less safety. buckle up, cowboy!
+  * format: atom, defaulting to :iolist; controls the format of the resulting encoding
+    ** :iolist: returns a list of binaries, [header, schema, data] or [schema, data]
+    ** :binary: returns a single binary buffer
   """
   @spec encode(term :: any(), opts :: encode_options()) :: iolist()
   @type encode_options() :: [
