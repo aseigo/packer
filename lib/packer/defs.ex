@@ -24,6 +24,7 @@ defmodule Packer.Defs do
       # collections, variable size, marked by an end byte value
       @c_list        0x21
       @c_map         0x22
+      @c_struct      0x23
       @c_collection_end 0x00
 
       # tuples are size 0..N where N up to 62 is encoded in the type byte

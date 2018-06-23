@@ -50,6 +50,13 @@ defmodule Packer.Decode do
     decode_next_map_pair(rem_schema, buffer, %{})
   end
 
+  defp decode_one(<<@c_struct, name_len :: 8-unsigned-integer, rem_schema :: binary>>, buffer) do
+    {name, rem_buffer} = String.split_at(buffer, name_len)
+    {rem_schema, rem_buffer, term} = decode_next_map_pair(rem_schema, rem_buffer, %{})
+    struct = Map.put(term, :__struct__, String.to_atom(name))
+    decoded(rem_schema, rem_buffer, struct)
+  end
+
   defp decode_one(<<type :: 8-unsigned-integer, rem_schema :: binary>>, buffer) do
     if Packer.Utils.is_tuple_type?(type) do
       {arity, rem_schema} = Packer.Utils.tuple_arity(type, rem_schema)
