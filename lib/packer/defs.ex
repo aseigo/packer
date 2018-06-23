@@ -102,7 +102,7 @@ defmodule Packer.Defs do
         unquote(fn_name)(schema, buffer)
       end
 
-      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-integer, rem_schema :: binary>>, buffer) do
+      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-little-integer, rem_schema :: binary>>, buffer) do
         if byte_size(buffer) < size do
           decoded(rem_schema, <<>>, unquote(on_fail))
         else

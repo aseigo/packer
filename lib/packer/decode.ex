@@ -50,7 +50,7 @@ defmodule Packer.Decode do
     decode_next_map_pair(rem_schema, buffer, %{})
   end
 
-  defp decode_one(<<@c_struct, name_len :: 8-unsigned-integer, rem_schema :: binary>>, buffer) do
+  defp decode_one(<<@c_struct, name_len :: 8-unsigned-little-integer, rem_schema :: binary>>, buffer) do
     {name, rem_buffer} = String.split_at(buffer, name_len)
     {rem_schema, rem_buffer, term} = decode_next_map_pair(rem_schema, rem_buffer, %{})
     #TODO: should we bother to check if the code for this struct is even loaded?
@@ -58,7 +58,7 @@ defmodule Packer.Decode do
     decoded(rem_schema, rem_buffer, struct)
   end
 
-  defp decode_one(<<type :: 8-unsigned-integer, rem_schema :: binary>>, buffer) do
+  defp decode_one(<<type :: 8-unsigned-little-integer, rem_schema :: binary>>, buffer) do
     if Packer.Utils.is_tuple_type?(type) do
       {arity, rem_schema} = Packer.Utils.tuple_arity(type, rem_schema)
       decode_next_tuple_item(rem_schema, buffer, arity, {})
@@ -69,13 +69,13 @@ defmodule Packer.Decode do
 
   defp decode_one(_schema, _buffer), do: {:error, :unexpected_data}
 
-  debuffer_primitive(@c_small_int, 1, 8-signed-integer, 0)
-  debuffer_primitive(@c_small_uint, 1, 8-unsigned-integer, 0)
-  debuffer_primitive(@c_short_int, 2, 16-signed-integer, 0)
-  debuffer_primitive(@c_short_uint, 2, 16-unsigned-integer, 0)
-  debuffer_primitive(@c_int, 4, 32-signed-integer, 0)
-  debuffer_primitive(@c_uint, 4, 32-unsigned-integer, 0)
-  debuffer_primitive(@c_big_int, 8, 64-signed-integer, 0)
+  debuffer_primitive(@c_small_int, 1, 8-signed-little-integer, 0)
+  debuffer_primitive(@c_small_uint, 1, 8-unsigned-little-integer, 0)
+  debuffer_primitive(@c_short_int, 2, 16-signed-little-integer, 0)
+  debuffer_primitive(@c_short_uint, 2, 16-unsigned-little-integer, 0)
+  debuffer_primitive(@c_int, 4, 32-signed-little-integer, 0)
+  debuffer_primitive(@c_uint, 4, 32-unsigned-little-integer, 0)
+  debuffer_primitive(@c_big_int, 8, 64-signed-little-integer, 0)
   debuffer_primitive(@c_byte, 1, 8-bits, "")
   debuffer_primitive(@c_float, 8, 64-float, 0.0)
 
@@ -109,7 +109,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 2 do
       decoded(rem_schema, buffer, Enum.reverse(acc))
     else
-      <<count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<count :: 8-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_list_items(type, rem_schema, buffer, is_container, acc, count)
     end
@@ -119,7 +119,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 3 do
       decoded(rem_schema, buffer, Enum.reverse(acc))
     else
-      <<count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<count :: 16-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_list_items(type, rem_schema, buffer, is_container, acc, count)
     end
@@ -129,7 +129,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 5 do
       decoded(rem_schema, buffer, Enum.reverse(acc))
     else
-      <<count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<count :: 32-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_list_items(type, rem_schema, buffer, is_container, acc, count)
     end
@@ -162,7 +162,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 2 do
       decoded(rem_schema, buffer, acc)
     else
-      <<rep_count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<rep_count :: 8-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_tuple_items(type, rem_schema, buffer, is_container, count, acc, rep_count)
     end
@@ -172,7 +172,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 3 do
       decoded(rem_schema, buffer, acc)
     else
-      <<rep_count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<rep_count :: 16-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_tuple_items(type, rem_schema, buffer, is_container, count, acc, rep_count)
     end
@@ -182,7 +182,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 5 do
       decoded(rem_schema, buffer, acc)
     else
-      <<rep_count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<rep_count :: 32-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       is_container = Packer.Utils.is_container_type?(type)
       decode_n_tuple_items(type, rem_schema, buffer, is_container, count, acc, rep_count)
     end
@@ -223,7 +223,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 2 do
       decoded(rem_schema, buffer, acc)
     else
-      <<count :: 8-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<count :: 8-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       decode_n_map_pairs(type, rem_schema, buffer, acc, count)
     end
   end
@@ -232,7 +232,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 3 do
       decoded(rem_schema, buffer, acc)
     else
-      <<count :: 16-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<count :: 16-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       decode_n_map_pairs(type, rem_schema, buffer, acc, count)
     end
   end
@@ -241,7 +241,7 @@ defmodule Packer.Decode do
     if byte_size(buffer) < 5 do
       decoded(rem_schema, buffer, acc)
     else
-      <<count :: 32-unsigned-integer, type :: 8-unsigned-integer, rem_schema :: binary>> = rem_schema
+      <<count :: 32-unsigned-little-integer, type :: 8-unsigned-little-integer, rem_schema :: binary>> = rem_schema
       decode_n_map_pairs(type, rem_schema, buffer, acc, count)
     end
   end
