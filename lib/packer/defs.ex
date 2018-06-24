@@ -85,34 +85,22 @@ defmodule Packer.Defs do
         quote do
           buffer
         end
-     else
+      else
         default_on_fail
       end
 
-
-    fn_name =
-      type
-      |> (fn {_, _, [{x, _, _}]} -> x end).()
-      |> Atom.to_string
-      |> (fn l -> l <> "_decode_helper" end).()
-      |> String.to_atom
-
     quote do
-      defp debuffer_one(unquote(type), schema, buffer) do
-        unquote(fn_name)(schema, buffer)
-      end
-
-      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-little-integer, rem_schema :: binary>>, buffer) do
+      defp debuffer_one(unquote(type), schema, <<size :: unquote(length_encoding_size)-unsigned-little-integer, buffer :: binary>>) do
         if byte_size(buffer) < size do
-          decoded(rem_schema, <<>>, unquote(on_fail))
+          decoded(schema, <<>>, unquote(on_fail))
         else
           {term, rem_buffer} = String.split_at(buffer, size)
-          decoded(rem_schema, rem_buffer, unquote(final_term))
+          decoded(schema, rem_buffer, unquote(final_term))
         end
       end
 
-      defp unquote(fn_name)(_schema, buffer) do
-        decoded(<<>>, buffer, <<>>)
+      defp debuffer_one(unquote(type), _schema, _buffer) do
+        decoded(<<>>, <<>>, <<>>)
       end
     end
   end

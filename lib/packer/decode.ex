@@ -1,5 +1,6 @@
 defmodule Packer.Decode do
   @moduledoc false
+  @compile {:inline, decoded: 3}
 
   use Packer.Defs
 
