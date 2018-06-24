@@ -54,7 +54,7 @@ defmodule Packer.Encode do
     if arity < @c_max_short_tuple do
       acc <> <<@c_tuple + arity :: 8-unsigned-little-integer>> <> subschema
     else
-      acc <> <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 16-unsigned-little-integer>> <> subschema
+      acc <> <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>> <> subschema
     end
   end
 

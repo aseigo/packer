@@ -16,8 +16,12 @@ defmodule Packer.Utils do
     arity = type &&& @c_tuple_arity_mask
     if (arity >= @c_max_short_tuple) do
       #FIXME: if the schema does not have any more bytes?
-      <<arity :: 16-unsigned-little-integer, rem_schema :: binary>> = schema
-      {arity, rem_schema}
+      if byte_size(schema) > 2 do
+        <<arity :: 24-unsigned-little-integer, rem_schema :: binary>> = schema
+        {arity, rem_schema}
+      else
+        {0, <<>>}
+      end
     else
       {arity, schema}
     end
