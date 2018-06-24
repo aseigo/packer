@@ -17,9 +17,10 @@ defmodule Packer.Defs do
       @c_float       0x09 # 8 bytes
       @c_byte        0x0A # 1 byte
       @c_binary_1    0x0B # N bytes, 1 byte length
-      @c_binary_2    0x0C # N bytes, 1 byte length
-      @c_binary_4    0x0D # N bytes, 1 byte length
-      @c_atom        0x0E # N bytes
+      @c_binary_2    0x0C # N bytes, 2 byte length
+      @c_binary_4    0x0D # N bytes, 4 byte length
+      @c_binary_8    0x0E # N bytes, 8 byte length
+      @c_atom        0x0F # N bytes, 1 byte length
 
       # collections, variable size, marked by an end byte value
       @c_list        0x21

@@ -163,14 +163,17 @@ defmodule Packer.Encode do
 
   defp encode_one(_opts, schema, buffer, t) when is_bitstring(t) do
     case byte_size(t) do
-      length when length <= 255 ->
+      length when length <= 0xFF ->
         {[@c_binary_1 | schema], buffer <> <<length :: 8-unsigned-little-integer>> <> t}
 
-      length when length <= 65_535 ->
+      length when length <= 0xFFFF ->
         {[@c_binary_2 | schema], buffer <> <<length :: 16-unsigned-little-integer>> <> t}
 
-      length ->
+      length when length <= 0xFFFFFFFF ->
         {[@c_binary_4 | schema], buffer <> <<length :: 32-unsigned-little-integer>> <> t}
+
+      length ->
+        {[@c_binary_8 | schema], buffer <> <<length :: 64-unsigned-little-integer>> <> t}
     end
   end
 

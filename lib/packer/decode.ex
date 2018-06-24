@@ -134,6 +134,7 @@ defmodule Packer.Decode do
   debuffer_binary(@c_binary_1, 8)
   debuffer_binary(@c_binary_2, 16)
   debuffer_binary(@c_binary_4, 32)
+  debuffer_binary(@c_binary_8, 64)
 
   defp debuffer_one(@c_list, schema, buffer) do
     decode_next_list_item(schema, buffer, [])
