@@ -17,9 +17,10 @@ defmodule Packer.Defs do
       @c_float       0x09 # 8 bytes
       @c_byte        0x0A # 1 byte
       @c_binary_1    0x0B # N bytes, 1 byte length
-      @c_binary_2    0x0C # N bytes, 1 byte length
-      @c_binary_4    0x0D # N bytes, 1 byte length
-      @c_atom        0x0E # N bytes
+      @c_binary_2    0x0C # N bytes, 2 byte length
+      @c_binary_4    0x0D # N bytes, 4 byte length
+      @c_binary_8    0x0E # N bytes, 8 byte length
+      @c_atom        0x0F # N bytes, 1 byte length
 
       # collections, variable size, marked by an end byte value
       @c_list        0x21
@@ -44,8 +45,8 @@ defmodule Packer.Defs do
       @c_max_short_tuple 0b01111111 - 0b01000000
       @c_var_size_tuple 0b01111111
       @c_tuple_arity_mask 0b00111111
-      @c_version_header <<0x02>> # '01'
-      @c_full_header <<0x45, 0x50, 0x4B, 0x52, 0x02>> # 'EPKR1'
+      @c_version_header <<0x03>>
+      @c_full_header <<0x45, 0x50, 0x4B, 0x52, 0x03>> # 'EPKR' + version
       @c_full_header_prefix <<0x45, 0x50, 0x4B, 0x52>> # 'EPKR'
     end
   end
@@ -85,34 +86,22 @@ defmodule Packer.Defs do
         quote do
           buffer
         end
-     else
+      else
         default_on_fail
       end
 
-
-    fn_name =
-      type
-      |> (fn {_, _, [{x, _, _}]} -> x end).()
-      |> Atom.to_string
-      |> (fn l -> l <> "_decode_helper" end).()
-      |> String.to_atom
-
     quote do
-      defp debuffer_one(unquote(type), schema, buffer) do
-        unquote(fn_name)(schema, buffer)
-      end
-
-      defp unquote(fn_name)(<<size :: unquote(length_encoding_size)-unsigned-little-integer, rem_schema :: binary>>, buffer) do
+      defp debuffer_one(unquote(type), schema, <<size :: unquote(length_encoding_size)-unsigned-little-integer, buffer :: binary>>) do
         if byte_size(buffer) < size do
-          decoded(rem_schema, <<>>, unquote(on_fail))
+          decoded(schema, <<>>, unquote(on_fail))
         else
           {term, rem_buffer} = String.split_at(buffer, size)
-          decoded(rem_schema, rem_buffer, unquote(final_term))
+          decoded(schema, rem_buffer, unquote(final_term))
         end
       end
 
-      defp unquote(fn_name)(_schema, buffer) do
-        decoded(<<>>, buffer, <<>>)
+      defp debuffer_one(unquote(type), _schema, _buffer) do
+        decoded(<<>>, <<>>, <<>>)
       end
     end
   end

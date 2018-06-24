@@ -50,36 +50,51 @@ defmodule PackerTest do
     M.encoding(-1_000_000_000_0000, <<7>>, <<0, 96, 141, 177, 231, 246, 255, 255>>)
     M.encoding("b", <<10>>, "b")
     M.encoding(3.14, <<9>>, <<64, 9, 30, 184, 81, 235, 133, 31>>)
-    M.encoding(:atom, <<14, 4>>, "atom")
+    M.encoding(:atom, <<15>>, <<4, "atom" :: binary>>)
   end
 
   test "packs short binaries" do
     binary = "binary"
-    M.encoding(binary, <<11, 6>>, binary)
+    M.encoding(binary, <<11>>, <<6>> <> binary)
   end
 
   test "packs medium binaries" do
     binary = String.duplicate("f", 30_000)
-    M.encoding(binary, <<12, 30_000 :: unsigned-16-little-integer>>, binary)
+    M.encoding(binary, <<12>>, <<30_000 :: unsigned-16-little-integer, binary :: binary>>)
   end
 
   test "packs long binaries" do
     binary = String.duplicate("f", 300_000)
-    M.encoding(binary, <<13, 300_000 :: unsigned-32-little-integer>>, binary)
+    M.encoding(binary, <<13>>, <<300_000 :: unsigned-32-little-integer, binary :: binary>>)
   end
 
   test "packs flat lists" do
     M.encoding([], <<33, 0>>, <<>>, [], false)
     M.encoding([1], <<33, 2, 0>>, <<1>>)
     M.encoding([1, 2, 3, 4, 5, 6, 7000], <<33, 160, 6, 2, 4, 0>>, <<1, 2, 3, 4, 5, 6, 88, 27>>)
-    M.encoding([1, :atom, "binary"], <<33, 2, 14, 4, 11, 6, 0>>, <<1, "atom", "binary">>)
+    M.encoding([1, :atom, "binary"], <<33, 2, 15, 11, 0>>, <<1, 4, "atom", 6, "binary">>)
   end
 
   test "packs nested lists" do
     M.encoding([[]], <<33, 33, 0, 0>>, <<>>)
     M.encoding([[1]], <<33, 33, 2, 0, 0>>, <<1>>)
     M.encoding([1, [1], 2], <<33, 2, 33, 2, 0, 2, 0>>, <<1, 1, 2>>)
-    M.encoding([1, [1, [], [:atom, [3]]], 2], <<33, 2, 33, 2, 33, 0, 33, 14, 4, 33, 2, 0, 0, 0, 2, 0>>, <<1, 1, 97, 116, 111, 109, 3, 2>>)
+    M.encoding([1, [1, [], [:atom, [3]]], 2], <<33, 2, 33, 2, 33, 0, 33, 15, 33, 2, 0, 0, 0, 2, 0>>, <<1, 1, 4, 97, 116, 111, 109, 3, 2>>)
+  end
+
+  test "packs lists of tuples" do
+    M.encoding([{1, 2}], <<33, 66, 160, 2, 2, 0>>, <<1, 2>>)
+    M.encoding([{1, 2}, {3, 4}], <<33, 160, 2, 66, 160, 2, 2, 0>>, <<1, 2, 3, 4>>)
+  end
+
+  test "packs highly repetative lists correctly" do
+    # we are testing c_repeat_N here
+    tuple_list = Enum.reduce(1..10, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
+    M.decoding(tuple_list)
+    tuple_list = Enum.reduce(1..500, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
+    M.decoding(tuple_list)
+    tuple_list = Enum.reduce(1..70_000, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
+    M.decoding(tuple_list)
   end
 
   test "packs tuples" do
@@ -98,7 +113,7 @@ defmodule PackerTest do
               21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
               41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60,
               61, 62, 63},
-             <<127, 63, 0, 160, 63, 2>>,
+             <<127, 63, 0, 0, 160, 63, 2>>,
              << 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
                20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38,
                39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57,
@@ -109,12 +124,12 @@ defmodule PackerTest do
 
   test "packs maps" do
     M.encoding(%{}, <<34, 0>>, "")
-    M.encoding(%{a: 1, b: 2}, <<34, 160, 2, 14, 1, 2, 0>>, <<97, 1, 98, 2>>)
+    M.encoding(%{a: 1, b: 2}, <<34, 160, 2, 15, 2, 0>>, <<1, 97, 1, 1, 98, 2>>)
     M.encoding(%{{"b", 123} => 1, {"c", 124} => 2}, <<34, 160, 2, 66, 10, 2, 2, 0>>, <<98, 123, 1, 99, 124, 2>>)
   end
 
   test "packs structs" do
-    M.encoding(%Foo{}, <<35, 10, 160, 2, 14, 1, 2, 0>>, <<69, 108, 105, 120, 105, 114, 46, 70, 111, 111, 97, 1, 98, 2>>)
+    M.encoding(%Foo{}, <<35, 10, 160, 2, 15, 2, 0>>, <<69, 108, 105, 120, 105, 114, 46, 70, 111, 111, 1, 97, 1, 1, 98, 2>>)
   end
 
   test "small integers are options" do
@@ -196,7 +211,7 @@ defmodule PackerTest do
   end
 
   test "poorly formed buffers the schema says should contain an atom return nil" do
-    assert nil === Packer.decode([Packer.encoded_term_header(), <<14, 300>>, "too short"])
+    assert nil === Packer.decode([Packer.encoded_term_header(), <<15>>, <<255 :: 8-unsigned-little-integer, "too short" :: binary>>])
   end
 
   test "unpacks short binaries" do
@@ -212,7 +227,7 @@ defmodule PackerTest do
   end
 
   test "unpacks a partial buffer when there are not enough bytes" do
-    assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13, 300_000 :: unsigned-32-little-integer>>, "too short"])
+    assert "too short" === Packer.decode([Packer.encoded_term_header(), <<13>>, <<300_000 :: unsigned-32-little-integer, "too short">>])
   end
 
   test "unpacks flat lists" do

@@ -49,28 +49,12 @@ defmodule Packer.Encode do
     #<<length :: 32-unsigned-little-integer, encoded :: binary>>
   end
 
-  defp encode_schema({@c_atom, length}, acc) do
-    acc <> <<@c_atom :: 8-unsigned-little-integer, length :: 8-unsigned-little-integer>>
-  end
-
-  defp encode_schema({@c_binary_1, length}, acc) when length <= 255 do
-    acc <> <<@c_binary_1 :: 8-unsigned-little-integer, length :: 8-unsigned-little-integer>>
-  end
-
-  defp encode_schema({@c_binary_1, length}, acc) when length <= 65_535 do
-      acc <> <<@c_binary_2 :: 8-unsigned-little-integer, length :: 16-unsigned-little-integer>>
-  end
-
-  defp encode_schema({@c_binary_1, length}, acc) do
-      acc <> <<@c_binary_4 :: 8-unsigned-little-integer, length :: 32-unsigned-little-integer>>
-  end
-
   defp encode_schema({@c_tuple, arity, elements}, acc) do
     subschema = encode_schema(elements)
     if arity < @c_max_short_tuple do
       acc <> <<@c_tuple + arity :: 8-unsigned-little-integer>> <> subschema
     else
-      acc <> <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 16-unsigned-little-integer>> <> subschema
+      acc <> <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>> <> subschema
     end
   end
 
@@ -89,11 +73,11 @@ defmodule Packer.Encode do
   end
 
   defp encode_schema({:rep, @c_repeat_2, reps}, acc) do
-    acc <> <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
+    acc <> <<@c_repeat_2 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
   end
 
   defp encode_schema({:rep, @c_repeat_4, reps}, acc) do
-    acc <> <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
+    acc <> <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
   end
 
   defp encode_schema({code, elements}, acc) when is_list(elements) do
@@ -178,12 +162,25 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_bitstring(t) do
-    {[{@c_binary_1, byte_size(t)} | schema], buffer <> t}
+    case byte_size(t) do
+      length when length <= 0xFF ->
+        {[@c_binary_1 | schema], buffer <> <<length :: 8-unsigned-little-integer>> <> t}
+
+      length when length <= 0xFFFF ->
+        {[@c_binary_2 | schema], buffer <> <<length :: 16-unsigned-little-integer>> <> t}
+
+      length when length <= 0xFFFFFFFF ->
+        {[@c_binary_4 | schema], buffer <> <<length :: 32-unsigned-little-integer>> <> t}
+
+      length ->
+        {[@c_binary_8 | schema], buffer <> <<length :: 64-unsigned-little-integer>> <> t}
+    end
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_atom(t) do
     bin = to_string(t)
-    {[{@c_atom, byte_size(bin)} | schema], buffer <> bin}
+    bin_size = byte_size(bin)
+    {[@c_atom | schema], buffer <> <<bin_size :: 8-unsigned-little-integer>> <> bin}
   end
 
   defp encode_one(_opts, schema, buffer, t) when is_float(t) do

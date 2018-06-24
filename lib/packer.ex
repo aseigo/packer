@@ -23,7 +23,8 @@ defmodule Packer do
   @type encode_options() :: [
                              {:compress, boolean},
                              {:short_int, boolean},
-                             {:header, :version | :full | :none}
+                             {:header, :version | :full | :none},
+                             {:format, :iolist | :binary}
                             ]
   defdelegate encode(term, opts \\ []), to: Packer.Encode, as: :from_term
 
