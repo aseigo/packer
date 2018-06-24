@@ -73,11 +73,11 @@ defmodule Packer.Encode do
   end
 
   defp encode_schema({:rep, @c_repeat_2, reps}, acc) do
-    acc <> <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
+    acc <> <<@c_repeat_2 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
   end
 
   defp encode_schema({:rep, @c_repeat_4, reps}, acc) do
-    acc <> <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
+    acc <> <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
   end
 
   defp encode_schema({code, elements}, acc) when is_list(elements) do

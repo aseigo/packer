@@ -82,6 +82,21 @@ defmodule PackerTest do
     M.encoding([1, [1, [], [:atom, [3]]], 2], <<33, 2, 33, 2, 33, 0, 33, 15, 33, 2, 0, 0, 0, 2, 0>>, <<1, 1, 4, 97, 116, 111, 109, 3, 2>>)
   end
 
+  test "packs lists of tuples" do
+    M.encoding([{1, 2}], <<33, 66, 160, 2, 2, 0>>, <<1, 2>>)
+    M.encoding([{1, 2}, {3, 4}], <<33, 160, 2, 66, 160, 2, 2, 0>>, <<1, 2, 3, 4>>)
+  end
+
+  test "packs highly repetative lists correctly" do
+    # we are testing c_repeat_N here
+    tuple_list = Enum.reduce(1..10, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
+    M.decoding(tuple_list)
+    tuple_list = Enum.reduce(1..500, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
+    M.decoding(tuple_list)
+    tuple_list = Enum.reduce(1..70_000, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
+    M.decoding(tuple_list)
+  end
+
   test "packs tuples" do
     M.encoding({1, 2}, <<66, 160, 2, 2>>, <<1, 2>>)
     M.encoding({ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
