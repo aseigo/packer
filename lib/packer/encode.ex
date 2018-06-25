@@ -41,16 +41,21 @@ defmodule Packer.Encode do
   def encoded_term_header(:version), do: @c_version_header
 
   defp encoded_iodata(schema, buffer, :none, :iolist), do: [schema, buffer]
+
   defp encoded_iodata(schema, buffer, :none, :binary) do
     schema_length = byte_size(schema)
     <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
   end
+
   defp encoded_iodata(schema, buffer, :full, :iolist), do: [@c_full_header, schema, buffer]
+
   defp encoded_iodata(schema, buffer, :full, :binary) do
     schema_length = byte_size(schema)
     @c_full_header <> <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
   end
+
   defp encoded_iodata(schema, buffer, :version, :iolist), do: [@c_version_header, schema, buffer]
+
   defp encoded_iodata(schema, buffer, :version, :binary) do
     schema_length = byte_size(schema)
     @c_version_header <> <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
@@ -125,8 +130,8 @@ defmodule Packer.Encode do
                         <<@c_atom>>)
   end
 
-  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_float(t) do
-    {[@c_float | schema], buffer <> <<t :: 64-float>>}
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_float(t) do
+    new_schema_fragment(opts, schema, buffer <> <<t :: 64-float>>, last_schema_frag, rep_count, <<@c_float>>)
   end
 
   defp add_struct(opts, schema, buffer, t, module) do
