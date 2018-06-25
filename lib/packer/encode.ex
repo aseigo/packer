@@ -11,29 +11,21 @@ defmodule Packer.Encode do
 
   def from_term(term, opts) do
     encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
-
-    {schema, buffer} =
-    case encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term) do
-        {schema, buffer, last_schema_frag, rep_count} ->
-            last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
-
-        final -> final
-    end
-
-    encoded_schema = schema
+    {schema, buffer} = encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term)
 
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
     format = Keyword.get(opts, :format, :iolist)
+
     if compress? do
       compressed_buffer = Packer.Utils.compress(buffer)
       if byte_size(compressed_buffer) < byte_size(buffer) do
-        encoded_iodata(encoded_schema, compressed_buffer, header_type, format)
+        encoded_iodata(schema, compressed_buffer, header_type, format)
       else
-        encoded_iodata(encoded_schema, buffer, header_type, format)
+        encoded_iodata(schema, buffer, header_type, format)
       end
     else
-      encoded_iodata(encoded_schema, buffer, header_type, format)
+      encoded_iodata(schema, buffer, header_type, format)
     end
   end
 
@@ -67,9 +59,15 @@ defmodule Packer.Encode do
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_tuple(t) do
     arity = tuple_size(t)
-    {tuple_schema, buffer} = add_tuple(opts, [], buffer, t, arity, 0)
+    tuple_schema =
+    if arity < @c_max_short_tuple do
+      <<@c_tuple + arity :: 8-unsigned-little-integer>>
+    else
+      <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>>
+    end
 
-    {tuple_schema, buffer}
+    {tuple_schema, buffer} = add_tuple(opts, tuple_schema, buffer, t, arity, <<>>, 0, 0)
+    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, tuple_schema)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_map(t) do
@@ -80,8 +78,9 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_list(t) do
-    {list_schema, buffer} = add_list(opts, schema <> <<@c_list>>, buffer, <<>>, 0, t)
-    {list_schema <> <<@c_collection_end>>, buffer}
+    {list_schema, buffer} = add_list(opts, <<@c_list>>, buffer, <<>>, 0, t)
+    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count,
+                        list_schema <> <<@c_collection_end>>)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_integer(t) do
@@ -160,20 +159,16 @@ defmodule Packer.Encode do
     {opts, [{key_schema, value_schema} | schema], buffer}
   end
 
-  defp add_tuple(_opts, schema, buffer, _tuple, arity, count) when count >= arity do
-    {schema, buffer}
+  defp add_tuple(opts, schema, buffer, _tuple, arity, last_schema_frag, rep_count, count) when count >= arity do
+    last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
   end
 
-  defp add_tuple(opts, schema, buffer, tuple, arity, count) do
-    #FIXME
-    last_schema_frag = <<>>
-    rep_count = 0
-
-    {tuple_schema, tuple_buffer} =
+  defp add_tuple(opts, schema, buffer, tuple, arity, last_schema_frag, rep_count, count) do
+    {tuple_schema, tuple_buffer, last_schema_frag, rep_count} =
       tuple
       |> elem(count)
       |> (fn x -> encode_one(opts, schema, buffer, last_schema_frag, rep_count, x) end).()
-    add_tuple(opts, tuple_schema, tuple_buffer, tuple, arity, count + 1)
+    add_tuple(opts, tuple_schema, tuple_buffer, tuple, arity, last_schema_frag, rep_count, count + 1)
   end
 
   defp add_list(opts, schema, buffer, last_schema_frag, rep_count, []) do
