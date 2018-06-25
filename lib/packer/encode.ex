@@ -1,12 +1,12 @@
 defmodule Packer.Encode do
   @moduledoc false
-  @compile {:inline, add_integer: 4, add_list: 4}
+  @compile {:inline, add_integer: 4, add_list: 6, new_schema_fragment: 6, last_schema_fragment: 5}
 
   use Packer.Defs
 
   def from_term(term, opts) do
     encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
-    {schema, buffer} = encode_one(encoding_opts, <<>>, <<>>, term)
+    {schema, buffer} = encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term)
     encoded_schema = schema
     #                     |> Enum.reverse()
     #                 |> encode_schema()
@@ -136,7 +136,11 @@ defmodule Packer.Encode do
   defp repeater_tuple(reps) when reps <= 65_535, do: {:rep, @c_repeat_2, reps + 1}
   defp repeater_tuple(reps), do: {:rep, @c_repeat_4, reps + 1}
 
-  defp encode_one(opts, schema, buffer, t) when is_tuple(t) do
+  defp repeater_schema_frag(reps) when reps <= 255, do: <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 8-unsigned-little-integer>>
+  defp repeater_schema_frag(reps) when reps <= 65_535, do: <<@c_repeat_2 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
+  defp repeater_schema_frag(reps), do: <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
+
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_tuple(t) do
     arity = tuple_size(t)
     {tuple_schema, buffer} = add_tuple(opts, [], buffer, t, arity, 0)
     tuple_schema = tuple_schema
@@ -146,28 +150,29 @@ defmodule Packer.Encode do
     {[{@c_tuple, arity, tuple_schema} | schema], buffer}
   end
 
-  defp encode_one(opts, schema, buffer, t) when is_map(t) do
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_map(t) do
     case Map.get(t, :__struct__) do
       nil    -> add_map(opts, schema, buffer, t)
       module -> add_struct(opts, schema, buffer, t, module)
     end
   end
 
-  defp encode_one(opts, schema, buffer, t) when is_list(t) do
-    {list_schema, buffer} = add_list(opts, schema <> <<@c_list>>, buffer, t)
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_list(t) do
+    {list_schema, buffer} = add_list(opts, schema <> <<@c_list>>, buffer, <<>>, 0, t)
     #list_schema = compress_schema(list_schema)
     {list_schema <> <<@c_collection_end>>, buffer}
   end
 
-  defp encode_one(opts, schema, buffer, t) when is_integer(t) do
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_integer(t) do
     {added_schema, buffer} = add_integer(opts, schema, buffer, t)
+    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, added_schema)
   end
 
-  defp encode_one(_opts, schema, buffer, <<_byte :: 8>> = t) do
+  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, <<_byte :: 8>> = t) do
     {[@c_byte | schema], buffer <> t}
   end
 
-  defp encode_one(_opts, schema, buffer, t) when is_bitstring(t) do
+  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_bitstring(t) do
     case byte_size(t) do
       length when length <= 0xFF ->
         {[@c_binary_1 | schema], buffer <> <<length :: 8-unsigned-little-integer>> <> t}
@@ -183,13 +188,13 @@ defmodule Packer.Encode do
     end
   end
 
-  defp encode_one(_opts, schema, buffer, t) when is_atom(t) do
+  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_atom(t) do
     bin = to_string(t)
     bin_size = byte_size(bin)
     {[@c_atom | schema], buffer <> <<bin_size :: 8-unsigned-little-integer>> <> bin}
   end
 
-  defp encode_one(_opts, schema, buffer, t) when is_float(t) do
+  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_float(t) do
     {[@c_float | schema], buffer <> <<t :: 64-float>>}
   end
 
@@ -222,8 +227,12 @@ defmodule Packer.Encode do
   end
 
   defp add_map_tuple({key, value}, {opts, schema, buffer}) do
-    {[key_schema], buffer} = encode_one(opts, [], buffer, key)
-    {[value_schema], buffer} = encode_one(opts, [], buffer, value)
+    #FIXME
+    last_schema_frag = <<>>
+    rep_count = 0
+
+    {[key_schema], buffer} = encode_one(opts, [], buffer, last_schema_frag, rep_count, key)
+    {[value_schema], buffer} = encode_one(opts, [], buffer, last_schema_frag, rep_count, value)
     {opts, [{key_schema, value_schema} | schema], buffer}
   end
 
@@ -232,21 +241,24 @@ defmodule Packer.Encode do
   end
 
   defp add_tuple(opts, schema, buffer, tuple, arity, count) do
+    #FIXME
+    last_schema_frag = <<>>
+    rep_count = 0
+
     {tuple_schema, tuple_buffer} =
       tuple
       |> elem(count)
-      |> (fn x -> encode_one(opts, schema, buffer, x) end).()
+      |> (fn x -> encode_one(opts, schema, buffer, last_schema_frag, rep_count, x) end).()
     add_tuple(opts, tuple_schema, tuple_buffer, tuple, arity, count + 1)
   end
 
-  defp add_list(_opts, schema, buffer, []) do
-    {schema, buffer}
+  defp add_list(opts, schema, buffer, last_schema_frag, rep_count, []) do
+    last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
   end
 
-  defp add_list(opts, schema, buffer, [next | rest]) do
-  #Enum.reduce(list, {schema, buffer}, fn element, {schema, buffer} -> encode_one(opts, schema, buffer, element) end)
-    {schema, buffer} = encode_one(opts, schema, buffer, next)
-    add_list(opts, schema, buffer, rest)
+  defp add_list(opts, schema, buffer, last_schema_frag, rep_count, [next | rest]) do
+    {schema, buffer, last_schema_frag, rep_count} = encode_one(opts, schema, buffer, last_schema_frag, rep_count, next)
+    add_list(opts, schema, buffer, last_schema_frag, rep_count, rest)
   end
 
   defp add_integer(%{small_ints: true}, schema, buffer, t) when t >= 0 and t <=255 do
@@ -283,5 +295,25 @@ defmodule Packer.Encode do
 
   defp add_integer(_opts, schema, buffer, t) do
     {<<@c_big_int>>, buffer <> <<t :: 64-signed-little-integer>>}
+  end
+
+  defp new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, added_schema) do
+    if added_schema == last_schema_frag do
+      {schema, buffer, last_schema_frag, rep_count + 1}
+    else
+      if rep_count > 0 do
+        {schema <> repeater_schema_frag(rep_count + 1) <> last_schema_frag, buffer, added_schema, 0}
+      else 
+        {schema <> last_schema_frag, buffer, added_schema, 0}
+      end
+    end
+  end
+
+  defp last_schema_fragment(_opts, schema, buffer, last_schema_frag, 0) do
+    {schema <> last_schema_frag, buffer}
+  end
+
+  defp last_schema_fragment(_opts, schema, buffer, last_schema_frag, rep_count) do
+    {schema <> repeater_schema_frag(rep_count + 1) <> last_schema_frag, buffer}
   end
 end
