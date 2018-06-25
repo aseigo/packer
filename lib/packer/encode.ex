@@ -88,26 +88,41 @@ defmodule Packer.Encode do
     {[@c_byte | schema], buffer <> t}
   end
 
-  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_bitstring(t) do
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_bitstring(t) do
     case byte_size(t) do
       length when length <= 0xFF ->
-        {[@c_binary_1 | schema], buffer <> <<length :: 8-unsigned-little-integer>> <> t}
+        new_schema_fragment(opts, schema,
+                            buffer <> <<length :: 8-unsigned-little-integer>> <> t,
+                            last_schema_frag, rep_count,
+                            <<@c_binary_1>>)
 
       length when length <= 0xFFFF ->
-        {[@c_binary_2 | schema], buffer <> <<length :: 16-unsigned-little-integer>> <> t}
+        new_schema_fragment(opts, schema,
+                            buffer <> <<length :: 16-unsigned-little-integer>> <> t,
+                            last_schema_frag, rep_count,
+                            <<@c_binary_2>>)
 
       length when length <= 0xFFFFFFFF ->
-        {[@c_binary_4 | schema], buffer <> <<length :: 32-unsigned-little-integer>> <> t}
+        new_schema_fragment(opts, schema,
+                            buffer <> <<length :: 32-unsigned-little-integer>> <> t,
+                            last_schema_frag, rep_count,
+                            <<@c_binary_4>>)
 
       length ->
-        {[@c_binary_8 | schema], buffer <> <<length :: 64-unsigned-little-integer>> <> t}
+        new_schema_fragment(opts, schema,
+                            buffer <> <<length :: 64-unsigned-little-integer>> <> t,
+                            last_schema_frag, rep_count,
+                            <<@c_binary_8>>)
     end
   end
 
-  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_atom(t) do
-    bin = to_string(t)
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_atom(t) do
+    bin = Atom.to_string(t)
     bin_size = byte_size(bin)
-    {[@c_atom | schema], buffer <> <<bin_size :: 8-unsigned-little-integer>> <> bin}
+    new_schema_fragment(opts, schema,
+                        buffer <> <<bin_size :: 8-unsigned-little-integer>> <> bin,
+                        last_schema_frag, rep_count,
+                        <<@c_atom>>)
   end
 
   defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, t) when is_float(t) do
@@ -207,7 +222,7 @@ defmodule Packer.Encode do
     else
       if rep_count > 0 do
         {schema <> repeater_schema_frag(rep_count + 1) <> last_schema_frag, buffer, added_schema, 0}
-      else 
+      else
         {schema <> last_schema_frag, buffer, added_schema, 0}
       end
     end
