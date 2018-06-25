@@ -89,8 +89,8 @@ defmodule Packer.Encode do
     new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, added_schema)
   end
 
-  defp encode_one(_opts, schema, buffer, last_schema_frag, rep_count, <<_byte :: 8>> = t) do
-    {[@c_byte | schema], buffer <> t}
+  defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, <<_byte :: 8>> = t) do
+    new_schema_fragment(opts, schema, buffer <> t, last_schema_frag, rep_count, <<@c_byte>>)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_bitstring(t) do
