@@ -1,13 +1,15 @@
 defmodule Packer.Encode do
   @moduledoc false
+  @compile {:inline, add_integer: 4, add_list: 4}
 
   use Packer.Defs
 
   def from_term(term, opts) do
-    {schema, buffer} = encode_one(opts, [], <<>>, term)
+    encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
+    {schema, buffer} = encode_one(encoding_opts, <<>>, <<>>, term)
     encoded_schema = schema
-                     |> Enum.reverse()
-                     |> encode_schema()
+    #                     |> Enum.reverse()
+    #                 |> encode_schema()
 
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
@@ -80,6 +82,10 @@ defmodule Packer.Encode do
     acc <> <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
   end
 
+  defp encode_schema({code, schema}, acc) when is_bitstring(schema) do
+    acc <> <<code :: 8-unsigned-little-integer, schema :: binary, @c_collection_end>>
+  end
+
   defp encode_schema({code, elements}, acc) when is_list(elements) do
     acc <> <<code :: 8-unsigned-little-integer>> <> encode_schema(elements) <> <<@c_collection_end>>
   end
@@ -148,13 +154,13 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(opts, schema, buffer, t) when is_list(t) do
-    {list_schema, buffer} = add_list(opts, [], buffer, t)
-    list_schema = compress_schema(list_schema)
-    {[{@c_list, list_schema} | schema], buffer}
+    {list_schema, buffer} = add_list(opts, schema <> <<@c_list>>, buffer, t)
+    #list_schema = compress_schema(list_schema)
+    {list_schema <> <<@c_collection_end>>, buffer}
   end
 
   defp encode_one(opts, schema, buffer, t) when is_integer(t) do
-    add_integer(opts, schema, buffer, t)
+    {added_schema, buffer} = add_integer(opts, schema, buffer, t)
   end
 
   defp encode_one(_opts, schema, buffer, <<_byte :: 8>> = t) do
@@ -234,47 +240,48 @@ defmodule Packer.Encode do
   end
 
   defp add_list(_opts, schema, buffer, []) do
-    {Enum.reverse(schema), buffer}
+    {schema, buffer}
   end
 
   defp add_list(opts, schema, buffer, [next | rest]) do
+  #Enum.reduce(list, {schema, buffer}, fn element, {schema, buffer} -> encode_one(opts, schema, buffer, element) end)
     {schema, buffer} = encode_one(opts, schema, buffer, next)
     add_list(opts, schema, buffer, rest)
   end
 
-  defp add_integer(opts, schema, buffer, t) when t >= 0 and t <=255 do
-    if Keyword.get(opts, :small_int, true) do
-      {[@c_small_uint | schema], buffer <> <<t :: 8-unsigned-little-integer>>}
-    else
-      {[@c_short_uint | schema], buffer <> <<t :: 16-unsigned-little-integer>>}
-    end
+  defp add_integer(%{small_ints: true}, schema, buffer, t) when t >= 0 and t <=255 do
+    {<<@c_small_uint>>, buffer <> <<t :: 8-unsigned-little-integer>>}
   end
 
-  defp add_integer(opts, schema, buffer, t) when t >= -127 and t < 0 do
-    if Keyword.get(opts, :small_int, true) do
-      {[@c_small_int | schema], buffer <> <<t :: 8-signed-little-integer>>}
-    else
-      {[@c_short_int | schema], buffer <> <<t :: 16-signed-little-integer>>}
-    end
+  defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <=255 do
+    {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
+  end
+
+  defp add_integer(%{small_ints: true}, schema, buffer, t) when t >= -127 and t < 0 do
+    {<<@c_small_int>> , buffer <> <<t :: 8-signed-little-integer>>}
+  end
+
+  defp add_integer(_opts, schema, buffer, t) when t >= -127 and t < 0 do
+    {<<@c_short_int>>, buffer <> <<t :: 16-signed-little-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 65_535 do
-    {[@c_short_uint | schema], buffer <> <<t :: 16-unsigned-little-integer>>}
+    {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= -32_767 and t < 0 do
-    {[@c_short_int | schema], buffer <> <<t :: 16-signed-little-integer>>}
+    {<<@c_short_int>>, buffer <> <<t :: 16-signed-little-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
-    {[@c_uint | schema], buffer <> <<t :: 32-unsigned-little-integer>>}
+    {<<@c_uint>>, buffer <> <<t :: 32-unsigned-little-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
-    {[@c_int | schema], buffer <> <<t :: 32-signed-little-integer>>}
+    {<<@c_int>>, buffer <> <<t :: 32-signed-little-integer>>}
   end
 
   defp add_integer(_opts, schema, buffer, t) do
-    {[@c_big_int | schema], buffer <> <<t :: 64-signed-little-integer>>}
+    {<<@c_big_int>>, buffer <> <<t :: 64-signed-little-integer>>}
   end
 end
