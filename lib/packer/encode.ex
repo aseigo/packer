@@ -9,10 +9,24 @@ defmodule Packer.Encode do
 
   use Packer.Defs
 
+  # A small note on this module ...
+  #
+  # I am not exactly proud of the readability of the code found herein.
+  # From inlined functions to functions with handfuls of parameters, to passing params around
+  # that most of the receiving functions don't need, to .. it's a bit uglier than I like, and
+  # a bit harder to read than it ought to be as a result. However, this is the result of
+  # optimizing in response to measured performance via profiling. "Make it work, then make it fast"
+  # often comes at the cost of declining readability. I apologize to all who are reading this
+  # and trying to make head and tails of it all. :)
+  #
+  #  -- Aaron
+
   def from_term(term, opts) do
     encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
+
     {schema, buffer, last_schema_frag, rep_count} = encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term)
     {schema, buffer} = last_schema_fragment(encoding_opts, schema, buffer, last_schema_frag, rep_count)
+
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
     format = Keyword.get(opts, :format, :iolist)
