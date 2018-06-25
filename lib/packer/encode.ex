@@ -11,7 +11,15 @@ defmodule Packer.Encode do
 
   def from_term(term, opts) do
     encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
-    {schema, buffer} = encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term)
+
+    {schema, buffer} =
+    case encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term) do
+        {schema, buffer, last_schema_frag, rep_count} ->
+            last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
+
+        final -> final
+    end
+
     encoded_schema = schema
 
     compress? = Keyword.get(opts, :compress, true)
