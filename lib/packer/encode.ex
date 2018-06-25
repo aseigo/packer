@@ -24,6 +24,17 @@ defmodule Packer.Encode do
   def from_term(term, opts) do
     encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
 
+    # here we start encoding with a call to encode_one
+    #
+    # we pass in the encoding options, and empty binaries to kick off the schema and buffer
+    # the next empty buffer is a stand-in for the last schema fragment and 0 for the repetition counter
+    # finally we pass in the term.
+    #
+    # the last schema fragment and repitition counter are used to minimize the schema: repeated schema
+    # elements are replaced with a repetition flag (@c_repeat_N), the number of repetitions, and then
+    # a single copy of the repeated schema element. this trivial approach to compressing the schema
+    # significantly reduces the size of the metadata required to parse the data in the buffer.
+
     {schema, buffer, last_schema_frag, rep_count} = encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term)
     {schema, buffer} = last_schema_fragment(encoding_opts, schema, buffer, last_schema_frag, rep_count)
 
