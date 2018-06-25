@@ -10,6 +10,7 @@ defmodule Pack.MixProject do
       deps: deps(),
       description: description(),
       package: package(),
+      source_url: "https://github.com/aseigo/packer",
       test_coverage: [tool: ExCoveralls],
       preferred_cli_env: ["coveralls": :test, "coveralls.detail": :test, "coveralls.html": :test]
     ]
