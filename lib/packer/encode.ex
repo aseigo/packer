@@ -1,6 +1,11 @@
 defmodule Packer.Encode do
   @moduledoc false
-  @compile {:inline, add_integer: 4, add_list: 6, new_schema_fragment: 6, last_schema_fragment: 5}
+  @compile {:inline,
+            add_integer: 4,
+            add_list: 6,
+            new_schema_fragment: 6,
+            last_schema_fragment: 5,
+            repeater_schema_frag: 1}
 
   use Packer.Defs
 
@@ -8,8 +13,6 @@ defmodule Packer.Encode do
     encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
     {schema, buffer} = encode_one(encoding_opts, <<>>, <<>>, <<>>, 0, term)
     encoded_schema = schema
-    #                     |> Enum.reverse()
-    #                 |> encode_schema()
 
     compress? = Keyword.get(opts, :compress, true)
     header_type = Keyword.get(opts, :header, :version)
@@ -45,97 +48,6 @@ defmodule Packer.Encode do
     @c_version_header <> <<schema_length :: 32-unsigned-little-integer>> <> schema <> buffer
   end
 
-  defp encode_schema(schema) do
-    Enum.reduce(schema, <<>>, &encode_schema/2)
-    #length = byte_size(encoded)
-    #<<length :: 32-unsigned-little-integer, encoded :: binary>>
-  end
-
-  defp encode_schema({@c_tuple, arity, elements}, acc) do
-    subschema = encode_schema(elements)
-    if arity < @c_max_short_tuple do
-      acc <> <<@c_tuple + arity :: 8-unsigned-little-integer>> <> subschema
-    else
-      acc <> <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>> <> subschema
-    end
-  end
-
-  defp encode_schema({@c_struct, name_length, elements}, acc) do
-    encoded_elements = Enum.reduce(elements, <<>>, &encode_map_schema_tuples/2)
-    acc <> <<@c_struct :: 8-unsigned-little-integer, name_length :: 8-unsigned-little-integer>> <> encoded_elements <> <<@c_collection_end>>
-  end
-
-  defp encode_schema({@c_map, elements}, acc) do
-    encoded_elements = Enum.reduce(elements, <<>>, &encode_map_schema_tuples/2)
-    acc <> <<@c_map:: 8-unsigned-little-integer>> <> encoded_elements <> <<@c_collection_end>>
-  end
-
-  defp encode_schema({:rep, @c_repeat_1, reps}, acc) do
-    acc <> <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 8-unsigned-little-integer>>
-  end
-
-  defp encode_schema({:rep, @c_repeat_2, reps}, acc) do
-    acc <> <<@c_repeat_2 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
-  end
-
-  defp encode_schema({:rep, @c_repeat_4, reps}, acc) do
-    acc <> <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
-  end
-
-  defp encode_schema({code, schema}, acc) when is_bitstring(schema) do
-    acc <> <<code :: 8-unsigned-little-integer, schema :: binary, @c_collection_end>>
-  end
-
-  defp encode_schema({code, elements}, acc) when is_list(elements) do
-    acc <> <<code :: 8-unsigned-little-integer>> <> encode_schema(elements) <> <<@c_collection_end>>
-  end
-
-  defp encode_schema({code, length}, acc) do
-    acc <> <<code :: 8-unsigned-little-integer, length :: 32-unsigned-little-integer>>
-  end
-
-  defp encode_schema(code, acc) do
-    acc <> <<code :: 8-unsigned-little-integer>>
-  end
-
-  defp encode_map_schema_tuples({value, key}, acc) do
-    acc = encode_schema(value, acc)
-    encode_schema(key, acc)
-  end
-
-  defp encode_map_schema_tuples(value, acc) do
-    # repeaters, e.g.
-    encode_schema(value, acc)
-  end
-
-  defp compress_schema(schema) do
-    compress_schema(schema, [], :__nothing_equals_me__, 0)
-    |> Enum.reverse()
-  end
-
-  defp compress_schema([], schema, :__nothing_equals_me__, 0), do: schema
-  defp compress_schema([], schema, last, 0), do: [last | schema]
-  defp compress_schema([], schema, last, reps), do: [last, repeater_tuple(reps) | schema]
-  defp compress_schema([next | rest], schema, last, reps) when next === last do
-    compress_schema(rest, schema, last, reps + 1)
-  end
-  defp compress_schema([next | rest], schema, last, reps) when reps > 0 do
-    compress_schema(rest, [last, repeater_tuple(reps) | schema], next, 0)
-  end
-  defp compress_schema([next | rest], schema, :__nothing_equals_me__, _reps) do
-    compress_schema(rest, schema, next, 0)
-  end
-  defp compress_schema([next | rest], schema, last, _reps) do
-    compress_schema(rest, [last | schema], next, 0)
-  end
-
-  # note: 1 is added to the reps since at the time of being called, the last
-  # rep will have not been tallied, or looked at another way the first item
-  # is "zeroth rep'd", and so we always are one short here
-  defp repeater_tuple(reps) when reps <= 255, do: {:rep, @c_repeat_1, reps + 1}
-  defp repeater_tuple(reps) when reps <= 65_535, do: {:rep, @c_repeat_2, reps + 1}
-  defp repeater_tuple(reps), do: {:rep, @c_repeat_4, reps + 1}
-
   defp repeater_schema_frag(reps) when reps <= 255, do: <<@c_repeat_1 :: 8-unsigned-little-integer, reps :: 8-unsigned-little-integer>>
   defp repeater_schema_frag(reps) when reps <= 65_535, do: <<@c_repeat_2 :: 8-unsigned-little-integer, reps :: 16-unsigned-little-integer>>
   defp repeater_schema_frag(reps), do: <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
@@ -143,11 +55,8 @@ defmodule Packer.Encode do
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_tuple(t) do
     arity = tuple_size(t)
     {tuple_schema, buffer} = add_tuple(opts, [], buffer, t, arity, 0)
-    tuple_schema = tuple_schema
-                   |> Enum.reverse()
-                   |> compress_schema()
 
-    {[{@c_tuple, arity, tuple_schema} | schema], buffer}
+    {tuple_schema, buffer}
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_map(t) do
@@ -159,7 +68,6 @@ defmodule Packer.Encode do
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_list(t) do
     {list_schema, buffer} = add_list(opts, schema <> <<@c_list>>, buffer, <<>>, 0, t)
-    #list_schema = compress_schema(list_schema)
     {list_schema <> <<@c_collection_end>>, buffer}
   end
 
@@ -206,23 +114,11 @@ defmodule Packer.Encode do
     {_, map_schema, buffer} = t
                            |> Map.from_struct()
                            |> Enum.reduce({opts, [], buffer}, &add_map_tuple/2)
-
-    map_schema =
-      map_schema
-      |> Enum.reverse()
-      |> compress_schema()
-
     {[{@c_struct, name_length, map_schema} | schema], buffer}
   end
 
   defp add_map(opts, schema, buffer, t)  do
     {_opts, map_schema, buffer} = Enum.reduce(t, {opts, [], buffer}, &add_map_tuple/2)
-
-    map_schema =
-      map_schema
-      |> Enum.reverse()
-      |> compress_schema()
-
     {[{@c_map, map_schema} | schema], buffer}
   end
 
