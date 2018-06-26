@@ -101,7 +101,7 @@ defmodule Packer.Decode do
     decode_next_map_pair(rem_schema, buffer, %{})
   end
 
-  defp decode_one(<<@c_struct, name_len :: 8-unsigned-little-integer, rem_schema :: binary>>, buffer) do
+  defp decode_one(<<@c_struct, rem_schema :: binary>>, <<name_len :: 8-unsigned-little-integer, buffer :: binary>>) do
     {name, rem_buffer} = String.split_at(buffer, name_len)
     {rem_schema, rem_buffer, term} = decode_next_map_pair(rem_schema, rem_buffer, %{})
     #TODO: should we bother to check if the code for this struct is even loaded?
