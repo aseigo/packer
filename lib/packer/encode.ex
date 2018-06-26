@@ -96,10 +96,14 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_map(t) do
-    case Map.get(t, :__struct__) do
-      nil    -> add_map(opts, schema, buffer, last_schema_frag, rep_count, t)
-      module -> add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module)
-    end
+    {map_schema, buffer, last_map_schema_frag, map_rep_count} =
+      case Map.get(t, :__struct__) do
+        nil    -> add_map(opts, schema, buffer, t)
+        module -> add_struct(opts, schema, buffer, t, module)
+      end
+
+    {map_schema, buffer} = last_schema_fragment(opts, map_schema, buffer, last_map_schema_frag, map_rep_count)
+    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, map_schema <> <<@c_collection_end :: 8-unsigned-little-integer>>)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_list(t) do
@@ -158,7 +162,7 @@ defmodule Packer.Encode do
     new_schema_fragment(opts, schema, buffer <> <<t :: 64-float>>, last_schema_frag, rep_count, <<@c_float>>)
   end
 
-  defp add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module) do
+  defp add_struct(opts, _schema, buffer, t, module) do
     struct_schema = <<@c_struct :: 8-unsigned-little-integer>>
     name_bin = to_string(module)
     name_length = byte_size(name_bin)
@@ -167,14 +171,14 @@ defmodule Packer.Encode do
     {_, map_schema, buffer, last_schema_frag, rep_count} =
       t
       |> Map.from_struct()
-      |> Enum.reduce({opts, struct_schema, buffer, last_schema_frag, rep_count}, &add_map_tuple/2)
+      |> Enum.reduce({opts, struct_schema, buffer, <<>>, 0}, &add_map_tuple/2)
 
     {map_schema, buffer, last_schema_frag, rep_count}
   end
 
-  defp add_map(opts, schema, buffer, last_schema_frag, rep_count, t)  do
+  defp add_map(opts, _schema, buffer, t)  do
     map_schema = <<@c_map :: 8-unsigned-little-integer>>
-    {_opts, map_schema, buffer, last_schema_frag, rep_count} = Enum.reduce(t, {opts, map_schema, buffer, last_schema_frag, rep_count}, &add_map_tuple/2)
+    {_opts, map_schema, buffer, last_schema_frag, rep_count} = Enum.reduce(t, {opts, map_schema, buffer, <<>>, 0}, &add_map_tuple/2)
     {map_schema, buffer, last_schema_frag, rep_count}
   end
 
@@ -206,43 +210,43 @@ defmodule Packer.Encode do
     add_list(opts, schema, buffer, last_schema_frag, rep_count, rest)
   end
 
-  defp add_integer(%{small_ints: true}, schema, buffer, t) when t >= 0 and t <=255 do
+  defp add_integer(%{small_ints: true}, _schema, buffer, t) when t >= 0 and t <=255 do
     {<<@c_small_uint>>, buffer <> <<t :: 8-unsigned-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <=255 do
+  defp add_integer(_opts, _schema, buffer, t) when t >= 0 and t <=255 do
     {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
   end
 
-  defp add_integer(%{small_ints: true}, schema, buffer, t) when t >= -127 and t < 0 do
+  defp add_integer(%{small_ints: true}, _schema, buffer, t) when t >= -127 and t < 0 do
     {<<@c_small_int>> , buffer <> <<t :: 8-signed-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) when t >= -127 and t < 0 do
+  defp add_integer(_opts, _schema, buffer, t) when t >= -127 and t < 0 do
     {<<@c_short_int>>, buffer <> <<t :: 16-signed-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 65_535 do
+  defp add_integer(_opts, _schema, buffer, t) when t >= 0 and t <= 65_535 do
     {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) when t >= -32_767 and t < 0 do
+  defp add_integer(_opts, _schema, buffer, t) when t >= -32_767 and t < 0 do
     {<<@c_short_int>>, buffer <> <<t :: 16-signed-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
+  defp add_integer(_opts, _schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
     {<<@c_uint>>, buffer <> <<t :: 32-unsigned-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
+  defp add_integer(_opts, _schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
     {<<@c_int>>, buffer <> <<t :: 32-signed-little-integer>>}
   end
 
-  defp add_integer(_opts, schema, buffer, t) do
+  defp add_integer(_opts, _schema, buffer, t) do
     {<<@c_big_int>>, buffer <> <<t :: 64-signed-little-integer>>}
   end
 
-  defp new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, added_schema) do
+  defp new_schema_fragment(_opts, schema, buffer, last_schema_frag, rep_count, added_schema) do
     if added_schema == last_schema_frag do
       {schema, buffer, last_schema_frag, rep_count + 1}
     else
