@@ -163,10 +163,9 @@ defmodule Packer.Encode do
   end
 
   defp add_struct(opts, _schema, buffer, t, module) do
-    struct_schema = <<@c_struct :: 8-unsigned-little-integer>>
     name_bin = Atom.to_string(module)
     name_length = byte_size(name_bin)
-    buffer = buffer <> <<name_length :: 8-unsigned-little-integer, name_bin :: binary>>
+    struct_schema = <<@c_struct :: 8-unsigned-little-integer, name_length :: 8-unsigned-little-integer, name_bin :: binary>>
 
     {_, map_schema, buffer, last_schema_frag, rep_count} =
       t

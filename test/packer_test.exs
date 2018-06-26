@@ -129,7 +129,7 @@ defmodule PackerTest do
   end
 
   test "packs structs" do
-    M.encoding(%Foo{}, <<35, 10, 160, 2, 15, 2, 0>>, <<69, 108, 105, 120, 105, 114, 46, 70, 111, 111, 1, 97, 1, 1, 98, 2>>)
+    M.encoding(%Foo{}, <<35, 10, 69, 108, 105, 120, 105, 114, 46, 70, 111, 111, 160, 2, 15, 2, 0>>, <<1, 97, 1, 1, 98, 2>>)
   end
 
   test "small integers are options" do
@@ -289,6 +289,11 @@ defmodule PackerTest do
 
   test "unpacks structs" do
     M.decoding(%Foo{})
+  end
+
+  test "unpacks lists of maps and structs" do
+    M.decoding([%{a: 1, b: 2}, %{c: 3, d: 4}, %{alpha: "yeah"}, 10])
+    M.decoding([%Foo{}, %Foo{}, %Foo{}, 10, %Foo{}])
   end
 
   test "unpacking without compresion" do
