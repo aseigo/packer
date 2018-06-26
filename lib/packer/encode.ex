@@ -24,7 +24,8 @@ defmodule Packer.Encode do
   #  -- Aaron
 
   def from_term(term, opts) do
-    encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
+    #encoding_opts = %{small_ints: Keyword.get(opts, :small_int, true)}
+    encoding_opts = Keyword.get(opts, :small_int, true)
 
     # here we start encoding with a call to encode_one
     #
@@ -222,7 +223,7 @@ defmodule Packer.Encode do
     add_list(opts, schema, buffer, last_schema_frag, rep_count, rest)
   end
 
-  defp add_integer(%{small_ints: true}, _schema, buffer, t) when t >= 0 and t <=255 do
+  defp add_integer(true, _schema, buffer, t) when t >= 0 and t <=255 do
     {<<@c_small_uint>>, buffer <> <<t :: 8-unsigned-little-integer>>}
   end
 
@@ -230,7 +231,7 @@ defmodule Packer.Encode do
     {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
   end
 
-  defp add_integer(%{small_ints: true}, _schema, buffer, t) when t >= -127 and t < 0 do
+  defp add_integer(true, _schema, buffer, t) when t >= -127 and t < 0 do
     {<<@c_small_int>> , buffer <> <<t :: 8-signed-little-integer>>}
   end
 
