@@ -58,9 +58,10 @@ defmodule Packer.Encode do
     end
   end
 
-  defp encode_schema({@c_struct, name_length, elements}, acc) do
+  defp encode_schema({@c_struct, name, elements}, acc) do
+    name_length = byte_size(name)
     encoded_elements = Enum.reduce(elements, <<>>, &encode_map_schema_tuples/2)
-    acc <> <<@c_struct :: 8-unsigned-little-integer, name_length :: 8-unsigned-little-integer>> <> encoded_elements <> <<@c_collection_end>>
+    acc <> <<@c_struct :: 8-unsigned-little-integer, name_length :: 8-unsigned-little-integer, name :: binary>> <> encoded_elements <> <<@c_collection_end>>
   end
 
   defp encode_schema({@c_map, elements}, acc) do
@@ -188,10 +189,6 @@ defmodule Packer.Encode do
   end
 
   defp add_struct(opts, schema, buffer, t, module) do
-    name_bin = to_string(module)
-    name_length = byte_size(name_bin)
-    buffer = buffer <> name_bin
-
     {_, map_schema, buffer} = t
                            |> Map.from_struct()
                            |> Enum.reduce({opts, [], buffer}, &add_map_tuple/2)
@@ -201,7 +198,8 @@ defmodule Packer.Encode do
       |> Enum.reverse()
       |> compress_schema()
 
-    {[{@c_struct, name_length, map_schema} | schema], buffer}
+    name_bin = to_string(module)
+    {[{@c_struct, name_bin, map_schema} | schema], buffer}
   end
 
   defp add_map(opts, schema, buffer, t)  do
