@@ -101,12 +101,8 @@ defmodule Packer.Decode do
     decode_next_map_pair(rem_schema, buffer, %{})
   end
 
-  defp decode_one(<<@c_struct, name_len :: 8-unsigned-little-integer, rem_schema :: binary>>, buffer) do
-    {name, rem_buffer} = String.split_at(buffer, name_len)
-    {rem_schema, rem_buffer, term} = decode_next_map_pair(rem_schema, rem_buffer, %{})
-    #TODO: should we bother to check if the code for this struct is even loaded?
-    struct = Map.put(term, :__struct__, String.to_atom(name))
-    decoded(rem_schema, rem_buffer, struct)
+  defp decode_one(<<@c_struct, rem_schema :: binary>>, buffer) do
+    debuffer_one(@c_struct, rem_schema, buffer)
   end
 
   defp decode_one(<<type :: 8-unsigned-little-integer, rem_schema :: binary>>, buffer) do
@@ -138,6 +134,18 @@ defmodule Packer.Decode do
 
   defp debuffer_one(@c_list, schema, buffer) do
     decode_next_list_item(schema, buffer, [])
+  end
+
+  defp debuffer_one(@c_map, schema, buffer) do
+    decode_next_map_pair(schema, buffer, %{})
+  end
+
+  defp debuffer_one(@c_struct, <<name_len :: 8-unsigned-little-integer, schema :: binary>>, buffer) do
+    {name, rem_schema} = String.split_at(schema, name_len)
+    {rem_schema, rem_buffer, term} = decode_next_map_pair(rem_schema, buffer, %{})
+    #TODO: should we bother to check if the code for this struct is even loaded?
+    struct = Map.put(term, :__struct__, String.to_atom(name))
+    decoded(rem_schema, rem_buffer, struct)
   end
 
   defp debuffer_one(type, schema, buffer) do
