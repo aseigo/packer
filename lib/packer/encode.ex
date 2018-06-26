@@ -93,7 +93,18 @@ defmodule Packer.Encode do
       <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>>
     end
 
-    {tuple_schema, buffer} = add_tuple(opts, tuple_schema, buffer, t, arity, <<>>, 0, 0)
+    {tuple_schema, buffer} =
+      case t do
+        {t1, t2} ->
+          {s1, buffer, f1, _} = encode_one(opts, tuple_schema, buffer, <<>>, 0, t1)
+          {s2, buffer, f2, _} = encode_one(opts, s1 <> f1, buffer, <<>>, 0, t2)
+          #last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
+          {s2 <> f2, buffer}
+
+        _ ->
+          add_tuple(opts, tuple_schema, buffer, t, arity, <<>>, 0, 0)
+      end
+
     new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, tuple_schema)
   end
 
