@@ -1,11 +1,13 @@
 defmodule Packer.Encode do
   @moduledoc false
-  @compile {:inline,
-            add_integer: 4,
-            add_list: 6,
-            new_schema_fragment: 6,
-            last_schema_fragment: 5,
-            repeater_schema_frag: 1}
+  @compile {
+    :inline,
+    add_integer: 4,
+    add_list: 6,
+    new_schema_fragment: 6,
+    last_schema_fragment: 5,
+    repeater_schema_frag: 1
+  }
 
   use Packer.Defs
 
