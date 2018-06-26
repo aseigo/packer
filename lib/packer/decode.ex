@@ -140,8 +140,8 @@ defmodule Packer.Decode do
     decode_next_map_pair(schema, buffer, %{})
   end
 
-  defp debuffer_one(@c_struct, <<name_len :: 8-unsigned-little-integer, schema :: binary>>, buffer) do
-    {name, rem_schema} = String.split_at(schema, name_len)
+  defp debuffer_one(@c_struct, <<name_len :: 8-unsigned-little-integer, rem_schema :: binary>>, buffer) do
+    {name, rem_schema} = String.split_at(rem_schema, name_len)
     {rem_schema, rem_buffer, term} = decode_next_map_pair(rem_schema, buffer, %{})
     #TODO: should we bother to check if the code for this struct is even loaded?
     struct = Map.put(term, :__struct__, String.to_atom(name))
@@ -208,7 +208,7 @@ defmodule Packer.Decode do
   defp decode_n_list_items(type, schema, buffer, is_container, acc, count) do
     {rem_schema, rem_buffer, term} = debuffer_one(type, schema, buffer)
 
-    # when we are decoding a repeating contanier, we need to re-use the schema
+    # when we are decoding a repeating container, we need to re-use the schema
     if is_container do
       decode_n_list_items(type, schema, rem_buffer, is_container, [term | acc], count - 1)
     else
