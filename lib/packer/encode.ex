@@ -97,8 +97,8 @@ defmodule Packer.Encode do
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_map(t) do
     case Map.get(t, :__struct__) do
-      nil    -> add_map(opts, schema, buffer, t)
-      module -> add_struct(opts, schema, buffer, t, module)
+      nil    -> add_map(opts, schema, buffer, last_schema_frag, rep_count, t)
+      module -> add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module)
     end
   end
 
@@ -158,30 +158,31 @@ defmodule Packer.Encode do
     new_schema_fragment(opts, schema, buffer <> <<t :: 64-float>>, last_schema_frag, rep_count, <<@c_float>>)
   end
 
-  defp add_struct(opts, schema, buffer, t, module) do
+  defp add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module) do
+    struct_schema = <<@c_struct :: 8-unsigned-little-integer>>
     name_bin = to_string(module)
     name_length = byte_size(name_bin)
-    buffer = buffer <> name_bin
+    buffer = buffer <> <<name_length :: 8-unsigned-little-integer, name_bin :: binary>>
 
-    {_, map_schema, buffer} = t
-                           |> Map.from_struct()
-                           |> Enum.reduce({opts, [], buffer}, &add_map_tuple/2)
-    {[{@c_struct, name_length, map_schema} | schema], buffer}
+    {_, map_schema, buffer, last_schema_frag, rep_count} =
+      t
+      |> Map.from_struct()
+      |> Enum.reduce({opts, struct_schema, buffer, last_schema_frag, rep_count}, &add_map_tuple/2)
+
+    {map_schema, buffer, last_schema_frag, rep_count}
   end
 
-  defp add_map(opts, schema, buffer, t)  do
-    {_opts, map_schema, buffer} = Enum.reduce(t, {opts, [], buffer}, &add_map_tuple/2)
-    {[{@c_map, map_schema} | schema], buffer}
+  defp add_map(opts, schema, buffer, last_schema_frag, rep_count, t)  do
+    map_schema = <<@c_map :: 8-unsigned-little-integer>>
+    {_opts, map_schema, buffer, last_schema_frag, rep_count} = Enum.reduce(t, {opts, map_schema, buffer, last_schema_frag, rep_count}, &add_map_tuple/2)
+    {map_schema, buffer, last_schema_frag, rep_count}
   end
 
-  defp add_map_tuple({key, value}, {opts, schema, buffer}) do
-    #FIXME
-    last_schema_frag = <<>>
-    rep_count = 0
-
-    {[key_schema], buffer} = encode_one(opts, [], buffer, last_schema_frag, rep_count, key)
-    {[value_schema], buffer} = encode_one(opts, [], buffer, last_schema_frag, rep_count, value)
-    {opts, [{key_schema, value_schema} | schema], buffer}
+  defp add_map_tuple({key, value}, {opts, schema, buffer, last_schema_frag, rep_count}) do
+    {_, buffer, key_schema, _} = encode_one(opts, <<>>, buffer, <<>>, 0, key)
+    {_, buffer, value_schema, _} = encode_one(opts, <<>>, buffer, <<>>, 0, value)
+    {schema, buffer, added_schema, rep_count} = new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, key_schema <> value_schema)
+    {opts, schema, buffer, added_schema, rep_count}
   end
 
   defp add_tuple(opts, schema, buffer, _tuple, arity, last_schema_frag, rep_count, count) when count >= arity do
