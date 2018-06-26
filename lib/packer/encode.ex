@@ -2,11 +2,13 @@ defmodule Packer.Encode do
   @moduledoc false
   @compile {
     :inline,
-    add_integer: 4,
+    add_integer: 6,
     add_list: 6,
     new_schema_fragment: 6,
     last_schema_fragment: 5,
-    repeater_schema_frag: 1
+    repeater_schema_frag: 1,
+    to_minimal_binary: 2,
+    to_binary: 2
   }
 
   use Packer.Defs
@@ -86,23 +88,23 @@ defmodule Packer.Encode do
   defp repeater_schema_frag(reps), do: <<@c_repeat_4 :: 8-unsigned-little-integer, reps :: 32-unsigned-little-integer>>
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_tuple(t) do
-    arity = tuple_size(t)
-    tuple_schema =
-    if arity < @c_max_short_tuple do
-      <<@c_tuple + arity :: 8-unsigned-little-integer>>
-    else
-      <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>>
-    end
 
     {tuple_schema, buffer} =
       case t do
         {t1, t2} ->
-          {s1, buffer, f1, _} = encode_one(opts, tuple_schema, buffer, <<>>, 0, t1)
-          {s2, buffer, f2, _} = encode_one(opts, s1 <> f1, buffer, <<>>, 0, t2)
-          #last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
-          {s2 <> f2, buffer}
+          {_, buffer, f1, _} = encode_one(opts, <<>>, buffer, <<>>, 0, t1)
+          {_, buffer, f2, _} = encode_one(opts, <<>>, buffer, f1, 0, t2)
+          {<<@c_tuple + 2 :: 8-unsigned-little-integer, to_minimal_binary(f1, f2) :: binary>>, buffer}
 
         _ ->
+          arity = tuple_size(t)
+          tuple_schema =
+            if arity < @c_max_short_tuple do
+              <<@c_tuple + arity :: 8-unsigned-little-integer>>
+            else
+              <<@c_var_size_tuple :: 8-unsigned-little-integer, arity :: 24-unsigned-little-integer>>
+            end
+
           add_tuple(opts, tuple_schema, buffer, t, arity, <<>>, 0, 0)
       end
 
@@ -110,25 +112,20 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_map(t) do
-    {map_schema, buffer, last_map_schema_frag, map_rep_count} =
       case Map.get(t, :__struct__) do
-        nil    -> add_map(opts, schema, buffer, t)
-        module -> add_struct(opts, schema, buffer, t, module)
+        nil    -> add_map(opts, schema, buffer, last_schema_frag, rep_count, t)
+        module -> add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module)
       end
-
-    {map_schema, buffer} = last_schema_fragment(opts, map_schema, buffer, last_map_schema_frag, map_rep_count)
-    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, map_schema <> <<@c_collection_end :: 8-unsigned-little-integer>>)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_list(t) do
-    {list_schema, buffer} = add_list(opts, <<@c_list>>, buffer, <<>>, 0, t)
+    {list_schema, buffer} = add_list(opts, <<>>, buffer, <<>>, 0, t)
     new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count,
-                        list_schema <> <<@c_collection_end>>)
+                        <<@c_list, list_schema :: binary, @c_collection_end>>)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_integer(t) do
-    {added_schema, buffer} = add_integer(opts, schema, buffer, t)
-    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, added_schema)
+    add_integer(opts, schema, buffer, last_schema_frag, rep_count, t)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, <<_byte :: 8>> = t) do
@@ -141,25 +138,25 @@ defmodule Packer.Encode do
         new_schema_fragment(opts, schema,
                             buffer <> <<length :: 8-unsigned-little-integer>> <> t,
                             last_schema_frag, rep_count,
-                            <<@c_binary_1>>)
+                            @c_binary_1)
 
       length when length <= 0xFFFF ->
         new_schema_fragment(opts, schema,
                             buffer <> <<length :: 16-unsigned-little-integer>> <> t,
                             last_schema_frag, rep_count,
-                            <<@c_binary_2>>)
+                            @c_binary_2)
 
       length when length <= 0xFFFFFFFF ->
         new_schema_fragment(opts, schema,
                             buffer <> <<length :: 32-unsigned-little-integer>> <> t,
                             last_schema_frag, rep_count,
-                            <<@c_binary_4>>)
+                            @c_binary_4)
 
       length ->
         new_schema_fragment(opts, schema,
                             buffer <> <<length :: 64-unsigned-little-integer>> <> t,
                             last_schema_frag, rep_count,
-                            <<@c_binary_8>>)
+                            @c_binary_8)
     end
   end
 
@@ -169,38 +166,56 @@ defmodule Packer.Encode do
     new_schema_fragment(opts, schema,
                         buffer <> <<bin_size :: 8-unsigned-little-integer>> <> bin,
                         last_schema_frag, rep_count,
-                        <<@c_atom>>)
+                        @c_atom)
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_float(t) do
-    new_schema_fragment(opts, schema, buffer <> <<t :: 64-float>>, last_schema_frag, rep_count, <<@c_float>>)
+    new_schema_fragment(opts, schema, buffer <> <<t :: 64-float>>, last_schema_frag, rep_count, @c_float)
   end
 
-  defp add_struct(opts, _schema, buffer, t, module) do
-    name_bin = Atom.to_string(module)
-    name_length = byte_size(name_bin)
-    struct_schema = <<@c_struct :: 8-unsigned-little-integer, name_length :: 8-unsigned-little-integer, name_bin :: binary>>
-
-    {_, map_schema, buffer, last_schema_frag, rep_count} =
+  defp add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module) do
+    {_, map_schema, buffer, last_map_schema_frag, map_rep_count} =
       t
       |> Map.from_struct()
-      |> Enum.reduce({opts, struct_schema, buffer, <<>>, 0}, &add_map_tuple/2)
+      |> Enum.reduce({opts, <<>>, buffer, <<>>, 0}, &add_map_tuple/2)
 
-    {map_schema, buffer, last_schema_frag, rep_count}
+    {map_schema, buffer} = last_schema_fragment(opts, map_schema, buffer, last_map_schema_frag, map_rep_count)
+
+    name_bin = Atom.to_string(module)
+    name_length = byte_size(name_bin)
+    #TODO: having the name in the schema results in smaller sizes when multiple of the same
+    # struct appear together but does this reflect common usage?
+    struct_schema = <<@c_struct :: 8-unsigned-little-integer, name_length :: 8-unsigned-little-integer, name_bin :: binary,
+                      map_schema :: binary, @c_collection_end :: 8-unsigned-little-integer>>
+    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, struct_schema)
   end
 
-  defp add_map(opts, _schema, buffer, t)  do
-    map_schema = <<@c_map :: 8-unsigned-little-integer>>
-    {_opts, map_schema, buffer, last_schema_frag, rep_count} = Enum.reduce(t, {opts, map_schema, buffer, <<>>, 0}, &add_map_tuple/2)
-    {map_schema, buffer, last_schema_frag, rep_count}
+  defp add_map(opts, schema, buffer, last_schema_frag, rep_count, t)  do
+    {_opts, map_schema, buffer, last_map_schema_frag, map_rep_count} = Enum.reduce(t, {opts, <<>>, buffer, <<>>, 0}, &add_map_tuple/2)
+    {map_schema, buffer} = last_schema_fragment(opts, map_schema, buffer, last_map_schema_frag, map_rep_count)
+    map_schema = <<@c_map, map_schema :: binary, @c_collection_end :: 8-unsigned-little-integer>>
+    new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, map_schema)
   end
 
   defp add_map_tuple({key, value}, {opts, schema, buffer, last_schema_frag, rep_count}) do
     {_, buffer, key_schema, _} = encode_one(opts, <<>>, buffer, <<>>, 0, key)
     {_, buffer, value_schema, _} = encode_one(opts, <<>>, buffer, <<>>, 0, value)
-    {schema, buffer, added_schema, rep_count} = new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, key_schema <> value_schema)
+    {schema, buffer, added_schema, rep_count} = new_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count, to_binary(key_schema, value_schema))
     {opts, schema, buffer, added_schema, rep_count}
   end
+
+  defp to_binary(x, y) when is_binary(x) and is_binary(y), do: x <> y
+  defp to_binary(x, y) when is_binary(x), do: x <> <<y>>
+  defp to_binary(x, y), do: <<x, y>>
+  defp to_minimal_binary(x, y) when is_binary(x) and is_binary(y) do
+    if x == y and byte_size(x) > 2 do
+      repeater_schema_frag(2) <> x
+    else
+      x <> y
+    end
+  end
+  defp to_minimal_binary(x, y), do: to_binary(x, y)
+
 
   defp add_tuple(opts, schema, buffer, _tuple, arity, last_schema_frag, rep_count, count) when count >= arity do
     last_schema_fragment(opts, schema, buffer, last_schema_frag, rep_count)
@@ -223,59 +238,74 @@ defmodule Packer.Encode do
     add_list(opts, schema, buffer, last_schema_frag, rep_count, rest)
   end
 
-  defp add_integer(true, _schema, buffer, t) when t >= 0 and t <=255 do
-    {<<@c_small_uint>>, buffer <> <<t :: 8-unsigned-little-integer>>}
+  defp add_integer(true, schema, buffer, last_schema_frag, rep_count, t) when t >= 0 and t <=255 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 8-unsigned-little-integer>>, last_schema_frag, rep_count, @c_small_uint)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) when t >= 0 and t <=255 do
-    {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
+  defp add_integer(_opts, schema, buffer, last_schema_frag, rep_count, t) when t >= 0 and t <=255 do
+    new_schema_fragment(false, schema, buffer <> <<t :: 16-unsigned-little-integer>>, last_schema_frag, rep_count, @c_short_uint)
   end
 
-  defp add_integer(true, _schema, buffer, t) when t >= -127 and t < 0 do
-    {<<@c_small_int>> , buffer <> <<t :: 8-signed-little-integer>>}
+  defp add_integer(true, schema, buffer, last_schema_frag, rep_count, t) when t >= -127 and t < 0 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 8-little-integer>>, last_schema_frag, rep_count, @c_small_int)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) when t >= -127 and t < 0 do
-    {<<@c_short_int>>, buffer <> <<t :: 16-signed-little-integer>>}
+  defp add_integer(_true, schema, buffer, last_schema_frag, rep_count, t) when t >= -127 and t < 0 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 16-little-integer>>, last_schema_frag, rep_count, @c_short_int)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) when t >= 0 and t <= 65_535 do
-    {<<@c_short_uint>>, buffer <> <<t :: 16-unsigned-little-integer>>}
+  defp add_integer(_true, schema, buffer, last_schema_frag, rep_count, t) when t >= 0 and t <= 65_535 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 16-unsigned-little-integer>>, last_schema_frag, rep_count, @c_short_uint)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) when t >= -32_767 and t < 0 do
-    {<<@c_short_int>>, buffer <> <<t :: 16-signed-little-integer>>}
+  defp add_integer(_true, schema, buffer, last_schema_frag, rep_count, t) when t >= -32_767 and t < 0 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 16-little-integer>>, last_schema_frag, rep_count, @c_short_int)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) when t >= 0 and t <= 4_294_967_295 do
-    {<<@c_uint>>, buffer <> <<t :: 32-unsigned-little-integer>>}
+  defp add_integer(_true, schema, buffer, last_schema_frag, rep_count, t) when t >= 0 and t <= 4_294_967_295 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 32-unsigned-little-integer>>, last_schema_frag, rep_count, @c_uint)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) when t >= -2_147_483_647 and t < 0 do
-    {<<@c_int>>, buffer <> <<t :: 32-signed-little-integer>>}
+  defp add_integer(_true, schema, buffer, last_schema_frag, rep_count, t) when t >= -2_147_483_647 and t < 0 do
+    new_schema_fragment(true, schema, buffer <> <<t :: 32-little-integer>>, last_schema_frag, rep_count, @c_int)
   end
 
-  defp add_integer(_opts, _schema, buffer, t) do
-    {<<@c_big_int>>, buffer <> <<t :: 64-signed-little-integer>>}
+  defp add_integer(_opts, schema, buffer, last_schema_frag, rep_count, t) do
+    new_schema_fragment(true, schema, buffer <> <<t :: 64-little-integer>>, last_schema_frag, rep_count, @c_big_int)
   end
 
   defp new_schema_fragment(_opts, schema, buffer, last_schema_frag, rep_count, added_schema) do
     if added_schema == last_schema_frag do
       {schema, buffer, last_schema_frag, rep_count + 1}
     else
+      schema_add =
+        if is_binary(last_schema_frag) do
+          last_schema_frag
+        else
+          <<last_schema_frag>>
+        end
+
       if rep_count > 0 do
-        {schema <> repeater_schema_frag(rep_count + 1) <> last_schema_frag, buffer, added_schema, 0}
+        {schema <> repeater_schema_frag(rep_count + 1) <> schema_add, buffer, added_schema, 0}
       else
-        {schema <> last_schema_frag, buffer, added_schema, 0}
+        {schema <> schema_add, buffer, added_schema, 0}
       end
     end
   end
 
   defp last_schema_fragment(_opts, schema, buffer, last_schema_frag, 0) do
-    {schema <> last_schema_frag, buffer}
+    if is_binary(last_schema_frag) do
+      {schema <> last_schema_frag, buffer}
+    else
+      {schema <> <<last_schema_frag>>, buffer}
+    end
   end
 
   defp last_schema_fragment(_opts, schema, buffer, last_schema_frag, rep_count) do
-    {schema <> repeater_schema_frag(rep_count + 1) <> last_schema_frag, buffer}
+    if is_binary(last_schema_frag) do
+      {schema <> repeater_schema_frag(rep_count + 1) <> last_schema_frag, buffer}
+    else
+      {schema <> repeater_schema_frag(rep_count + 1) <> <<last_schema_frag>>, buffer}
+    end
   end
 end
