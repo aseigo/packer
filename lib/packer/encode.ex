@@ -169,7 +169,7 @@ defmodule Packer.Encode do
   end
 
   defp encode_one(opts, schema, buffer, last_schema_frag, rep_count, t) when is_float(t) do
-    new_schema_fragment(opts, schema, buffer <> <<t :: 64-float>>, last_schema_frag, rep_count, @c_float)
+    new_schema_fragment(opts, schema, buffer <> <<t :: 64-little-float>>, last_schema_frag, rep_count, @c_float)
   end
 
   defp add_struct(opts, schema, buffer, last_schema_frag, rep_count, t, module) do
