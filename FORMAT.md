@@ -1,9 +1,9 @@
-== Packer Serialization Format
+## Packer Serialization Format
 
 This document describes the binary format used by Packer to serialize
 arbitrary Erlang/Elixir terms.
 
-== Header, Schema, Data
+## Header, Schema, Data
 
 A term encoded using packer has three segments:
 
@@ -33,7 +33,7 @@ often resulting in a dramatic reduction in bytes used.
 That is a 331x reduction in size. In fact, for all but the simplest of terms, this encoding
 beats `term_to_binary` in encoded size. For communicating over networks, this is vital.
 
-== Current limitations
+## Current limitations
 
 Current limitations include:
 
@@ -54,7 +54,7 @@ Current limitations include:
 
  * The only implementation is in Elixir, so not the fastest possible thing
 
-== Format
+## Format
 
 Packer can serialize to one of two formats:
 
@@ -73,7 +73,7 @@ Packer can serialize to one of two formats:
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 
-== Header
+## Header
 
 The head is optional and can be skipped altogether for cases where you can
 guarantee the same version of Packer is being used. By default, the version
@@ -96,7 +96,7 @@ of type:
   |    Version    |                   Schema...                   |
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
-== Schema
+## Schema
 
 The schema contains a binary record of the data types that appear in the
 term, separate from the data in the term which is stored in the data
@@ -129,15 +129,15 @@ Each entry consists of a one byte "type code" that maps to the kind of data that
 appears next in the data block; containers and repeat directives may have
 additional information encoded diretly after the type code.
 
-=== Primitives
+### Primitives
 
-==== Numeric
+#### Numeric
 
 To limit the number of bytes required, integers support variable size encoding depending
 on the value of the number. All numbers are stored in little endian order.
 
       Type        Code           MinVal         MaxVal   Bytes encoded
-      ==========  ====   ==============  =============   =============
+      ##########  ####   ##############  #############   #############
       small_int   0x01             -127            127   1
       small_uint  0x02                0            255   1
       short_int   0x03          -32 767         32 767   2
@@ -149,19 +149,19 @@ on the value of the number. All numbers are stored in little endian order.
 
   NOTE: large_int for arbitrary bignum integers is not yet implemented; 0x08 is reserved for this purpose
 
-Example encoding of 10,000, including the version header (v = 3):
+Example encoding of 10,000, including the version header (v4):
 
    0                   1                   2                   3  
    0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-  |      0x03     |      0x04     |      0x10     |      0x27     |
+  |      0x04     |      0x04     |      0x10     |      0x27     |
   +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
 
 Floats are encoded as 64-bit floats (64-float in Erlangese):
 
       Type        Code   Bytes encoded
-      ==========  ====   =============
+      ##########  ####   #############
       float       0x09   8
 
 Example of 3.14:
@@ -178,7 +178,7 @@ Example of 3.14:
 
   [<<3>>, "\t", <<64, 9, 30, 184, 81, 235, 133, 31>>]
 
-==== Binary
+#### Binary
 
 There are three data types encoded as binaries: bitstring binaries, atoms and single bytes. Both
 atoms and binaries include their length in the data segement. The number of bytes used to
@@ -187,7 +187,7 @@ can only have 255 characters) while binaries can have a length encoding of 1-4 b
 do not require a length encoding.
 
       Type        Code   Length Bytes  Bytes encoded
-      ==========  ====   ============  =============
+      ##########  ####   ############  #############
       byte        0x0A   0             1
       binary_1    0x0B   1             0..255
       binary_2    0x0C   2             0..65_535
@@ -211,9 +211,9 @@ Example of the atom "true":
     NOTE: it would be very nice to be able to use the atom cache to send integer values
     rather than full strings for atoms when available.
 
-= Collections
+# Collections
 
-== Lists
+## Lists
 
 Lists are encoded much like primitives with code 0x21 with the exception that the
 end of a list is marked in the schema with a null byte.
@@ -233,7 +233,7 @@ Example of [1, 2, 3]:
 
     [<<3>>, <<33, 160, 2, 2, 0>>, <<1, 2>>]
 
-=== Maps
+### Maps
 
 Maps are denoted with type code 0x22, end with a null byte, and contain pairs of key
 and value types.
@@ -243,7 +243,7 @@ codes first in one sub-buffer in the schema data, and values to follow. The rati
 that keys are often of the same data type, but values often are not. This will allow
 for more efficient encoding as the key types are likely to repeat.
 
-=== Structs
+### Structs
 
 Structs are encoded exactly like maps except that the name of the struct is encoded
 in the schema:
@@ -259,7 +259,7 @@ it is not uncommon for structs of the same type to appear in collections like li
 and this gives the opportunity to easily remove those bytes altogether from the data
 when they do appear in sequence.
 
-=== Tuples
+### Tuples
 
 Tuples are the special beast. A tuple with no items ({}) is represented as 0x40. Tuples
 with 1..63 elements are 0x40 + the number of items in the tuple. This allows encoding
@@ -283,13 +283,13 @@ Empty tuple:
 
   [<<4>>, <<67, 160, 3, 2>>, <<1, 2, 3>>]
 
-== Repeat directives
+## Repeat directives
 
 A repeat diretive denotes that the next term in the schema is repeated 2 or more times.
 To remain thrifty, repititions consist of a repition type code (1 byte) and then the
 number of times the following term is repeated in 1, 2 or 4 bytes as needed.
 
-The repition type codes all have bits 8 and 6 set to 1 (e.g. are >= 160), allowing for
+The repition type codes all have bits 8 and 6 set to 1 (e.g. are ># 160), allowing for
 them to be easily detected from other types by bit mask (0b1000000) and by simple
 greater than as the largest tuple type code is 127 (0b01111111).
 
@@ -298,7 +298,7 @@ greater than as the largest tuple type code is 127 (0b01111111).
   or less iterations
 
       Type        Code   Rep Count Bytes
-      ==========  ====   ===============
+      ##########  ####   ###############
       repeat_1    0xA0   1
       repeat_2    0xA1   2
       repeat_4    0xA2   4
@@ -318,7 +318,7 @@ Example of [1, 2, 3]:
 
     [<<3>>, <<33, 160, 2, 2, 0>>, <<1, 2>>]
 
-== Data
+## Data
 
 The data segment is encoded with all numeric values in little-endian byte order. Virtually
 all machines are little-endian, and so even though endianness conversion is quite cheap these
