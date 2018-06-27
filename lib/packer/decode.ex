@@ -124,7 +124,7 @@ defmodule Packer.Decode do
   debuffer_primitive(@c_uint, 4, 32-unsigned-little-integer, 0)
   debuffer_primitive(@c_big_int, 8, 64-signed-little-integer, 0)
   debuffer_primitive(@c_byte, 1, 8-bits, "")
-  debuffer_primitive(@c_float, 8, 64-float, 0.0)
+  debuffer_primitive(@c_float, 8, 64-little-float, 0.0)
 
   debuffer_binary(@c_atom, 8, nil, &String.to_atom/1)
   debuffer_binary(@c_binary_1, 8)
