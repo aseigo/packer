@@ -40,6 +40,7 @@ Current limitations include:
  * currently no support for:
     * PIDs
     * ports
+    * node names
     * functions
     * integers requiring more than 64 bits of storage
 
