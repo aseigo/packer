@@ -59,7 +59,9 @@ Current limitations include:
 Packer can serialize to one of two formats:
 
  * An iolist: [header :: binary, schema :: binary, data :: binary]
- * A binary:
+ * A binary
+
+The binary format looks like this:
 
       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
