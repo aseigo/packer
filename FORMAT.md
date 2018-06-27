@@ -334,5 +334,5 @@ When compression results in a larger payload size, it is dropped and the uncompr
 returned in the data segment.
 
     NOTE: Due to the compression library used (:zstd), a streaming decoder is not currently
-    implemented. However, :zstd does support streaming compression/decompression so this would
-    be possible.
+    implemented. However, the zstd algorithm does support streaming compression/decompression 
+    so this would be possible.
