@@ -19,15 +19,15 @@ the schema, it offers opportunity for easy compression of that content,
 often resulting in a dramatic reduction in bytes used.
 
     tuple_list = Enum.reduce(1..500, [], fn  x, acc -> [{x * 2, x * 2 + 1} | acc] end)
-    tuple_map = Enum.reduce(1..10_000, %{},
+    tuple_map = Enum.reduce(1..100_000, %{},
                             fn x, acc ->
                               Map.put(acc, {x * 2, x * 2 + 1}, tuple_list)
                             end)
 
-    :erlang.term_to_binary(tuple_map) |> byte_size() |> (fn x -> x / 1024 / 1024 end).()     
+    :erlang.term_to_binary(tuple_map) |> byte_size() |> (fn x -> x / 1024 / 1024 end).()
     501.2504997253418
 
-    Packer.encode(tuple_map) |> byte_size() |> (fn x -> x / 1024 / 1024 end).()     
+    Packer.encode(tuple_map) |> byte_size() |> (fn x -> x / 1024 / 1024 end).()
     1.5183916091918945
 
 That is a 331x reduction in size. In fact, for all but the simplest of terms, this encoding
